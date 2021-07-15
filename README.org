@@ -1,0 +1,27 @@
+#+TITLE: beego-onc
+#+SETUPFILE: ~/s3sync/org/conf/setup.config
+#+FILETAGS: :biscari:golang:go-channels:cobra:viper:web:negroni:gorilla
+
+First beego trial iteration:
+1. http controller
+2. rest controller
+3. models
+4. sqlite
+
+* Prerequisites
+- Beego v2.0.2
+- Go 1.16.x
+
+* Commands
+#+begin_src bash
+curl -X GET "http://127.0.0.1:5088/v1/user/create" -H  "accept: application/json"
+#+end_src
+
+* Testing
+..
+
+* General Instructions
+..
+
+* Where to go from here?
+..
