@@ -15,6 +15,9 @@ First beego trial iteration:
 * Commands
 #+begin_src bash
 curl -X GET "http://127.0.0.1:5088/v1/user/create" -H  "accept: application/json"
+
+./beego-onc orm syncdb -h
+./beego-onc orm syncdb -db "oncdb" -force=true -v=true
 #+end_src
 
 * Testing
