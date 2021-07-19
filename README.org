@@ -1,6 +1,6 @@
-#+TITLE: beego-onc
+#+TITLE: beego-auth
 #+SETUPFILE: ~/s3sync/org/conf/setup.config
-#+FILETAGS: :biscari:golang:go-channels:cobra:viper:web:negroni:gorilla
+#+FILETAGS: :biscari:golang:go-channels:authentication:beego:web
 
 First beego trial iteration:
 1. http controller
