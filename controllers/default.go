@@ -1,6 +1,8 @@
 package controllers
 
 import (
+	"fmt"
+
 	beego "github.com/beego/beego/v2/server/web"
 )
 
@@ -10,6 +12,12 @@ type MainController struct {
 }
 
 func (this *MainController) activeContent(view string) {
+	httpport, err := beego.AppConfig.String("httpport")
+	if err != nil {
+		fmt.Println(err)
+	}
+	this.Data["Httpport"] = httpport
+
 	this.Layout = "basic-layout.tpl"
 	this.LayoutSections = make(map[string]string)
 	this.LayoutSections["Header"] = "header.tpl"
@@ -21,6 +29,7 @@ func (this *MainController) activeContent(view string) {
 	sess := this.GetSession("auth")
 
 	// TODO Explain Data.InSession logic
+	// What does m["first"] refer to??
 	if sess != nil {
 		this.Data["InSession"] = 1 // for login bar in header.tpl
 		m := sess.(map[string]interface{})

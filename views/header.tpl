@@ -10,13 +10,20 @@
 <body>
 <!-- start header -->
 <div id="header">
+        <div align="right">
+             {{if .InSession}}
+             Welcome, {{.First}} [<a href="http://localhost:{{.Httpport}}/logout">Logout</a>|<a href="http://localhost:{{.Httpport}}/profile">Profile</a>]
+             {{else}}
+             [<a href="http://localhost:{{.Httpport}}/login/home">Login</a>]
+             {{end}}
+        </div>
       	<div class="wrapper clearfix">
         	<div id="logo">
 			<a href="#"><img src="/static/img/logo.png" alt="LOGO"></a>
 		</div>
 		<ul id="navigation">
 			<li class="selected">
-                                <a href="http://localhost:5088/home">home</a>
+                                <a href="http://localhost:{{.Httpport}}/home">home</a>
 			</li>
 			<li>
 				<a href="#">About</a>
