@@ -1,8 +1,8 @@
 package main
 
 import (
-	"beego-onc/models"
-	_ "beego-onc/routers"
+	_ "beego-auth/models"
+	_ "beego-auth/routers"
 	"fmt"
 	"os"
 
@@ -14,13 +14,6 @@ import (
 )
 
 func init() {
-	// beego.BConfig.WebConfig.Session.SessionOn = true
-	// beego.BConfig.WebConfig.Session.SessionProvider = "postgresql"
-	// beego.BConfig.WebConfig.Session.SessionProviderConfig = "postgres://pqgotest:password@localhost/pqgotest?sslmode=verify-full"
-
-	// TODO overwrite BeegoConfig
-	// beego.LoadAppConfig("yaml", "conf/app.conf")
-
 	// Create DB
 	os.MkdirAll("./data/dev/", 0755)
 	os.Create("./data/dev/onc.db")
@@ -29,8 +22,6 @@ func init() {
 	orm.RegisterDataBase("default", "sqlite3", "./data/dev/default.db")
 	orm.RegisterDataBase("oncdb", "sqlite3", "./data/dev/onc.db")
 
-	// Need to register model in init
-	orm.RegisterModel(new(models.OncUser), new(models.OncProfile))
 }
 
 func main() {
@@ -76,6 +67,7 @@ func main() {
 	// Enable cmd: orm syncdb
 	orm.RunCommand()
 
+	beego.BConfig.WebConfig.Session.SessionOn = true
 	beego.Run()
 
 }

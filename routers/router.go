@@ -1,7 +1,7 @@
 package routers
 
 import (
-	"beego-onc/controllers"
+	"beego-auth/controllers"
 
 	beego "github.com/beego/beego/v2/server/web"
 )
@@ -17,6 +17,13 @@ func init() {
 	)
 	beego.AddNamespace(ns)
 
-	beego.Router("/", &controllers.MainController{})
+	beego.Router("/home", &controllers.MainController{})
+	// beego.Router("/user/login/:back", &controllers.MainController{}, "get,post:Login")
+	// beego.Router("/user/logout", &controllers.MainController{}, "get:Logout")
+	// beego.Router("/user/register", &controllers.MainController{}, "get,post:Register")
+	// beego.Router("/user/profile", &controllers.MainController{}, "get,post:Profile")
+	// beego.Router("/user/verify/:uuid({[0-9A-F]{8}-[0-9A-F]{4}-4[0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12}})", &controllers.MainController{}, "get:Verify")
+	// beego.Router("/user/remove", &controllers.MainController{}, "get,post:Remove")
+	// beego.Router("/notice", &controllers.MainController{}, "get:Notice")
 
 }
