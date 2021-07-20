@@ -14,7 +14,7 @@
              {{if .InSession}}
              Welcome, {{.First}} [<a href="http://localhost:{{.Httpport}}/logout">Logout</a>|<a href="http://localhost:{{.Httpport}}/profile">Profile</a>]
              {{else}}
-             [<a href="http://localhost:{{.Httpport}}/login/home">Login</a>]
+             [<a href="http://localhost:{{.Httpport}}/user/login/home">Login</a>]
              {{end}}
         </div>
       	<div class="wrapper clearfix">
