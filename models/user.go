@@ -2,24 +2,23 @@ package models
 
 import (
 	"time"
+
+	"github.com/astaxie/beego/orm"
 )
 
-type OncUser struct {
-	Id      int
-	Name    string
-	Email   string      `orm:"unique"`
-	Profile *OncProfile `orm:"rel(one)"` // OneToOne relation
-}
-
-type OncProfile struct {
-	Id      int
-	Age     int16
-	Answer  string
-	Created time.Time `orm:"type(datetime);precision(2)"`
-	Balance float64   `orm:"digits(12);decimals(4)"`
-	User    *OncUser  `orm:"reverse(one)"` // Reverse relationship (optional)
+//
+type AuthUser struct {
+	Id       int
+	First    string
+	Last     string
+	Email    string `orm:"unique"`
+	Password string
+	Reg_key  string
+	Reg_date time.Time `orm:"auto_now_add;type(datetime)"`
 }
 
 func init() {
-	// Initialized before main.init() <- Db create and table initialize in main!!
+
+	orm.RegisterModel(new(AuthUser))
+
 }

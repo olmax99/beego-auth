@@ -12,12 +12,20 @@ First beego trial iteration:
 - Beego v2.0.2
 - Go 1.16.x
 
+* Getting Started
+** Run Main
+#+begin_src bash
+export VAULT_ADDR='http://127.0.0.1:8200'
+export BEEGO_VAULT_TOKEN=***
+
+$ go build
+$ ./beego-vault
+#+end_src
+
 * Commands
 #+begin_src bash
-curl -X GET "http://127.0.0.1:5088/v1/user/create" -H  "accept: application/json"
-
-./beego-onc orm syncdb -h
-./beego-onc orm syncdb -db "oncdb" -force=true -v=true
+./beego-auth orm syncdb -h
+./beego-auth orm syncdb -db "authdb" -force=true -v=true
 #+end_src
 
 * Testing

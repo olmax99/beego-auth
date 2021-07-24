@@ -16,11 +16,11 @@ import (
 func init() {
 	// Create DB
 	os.MkdirAll("./data/dev/", 0755)
-	os.Create("./data/dev/onc.db")
+	os.Create("./data/dev/auth.db")
 
 	orm.RegisterDriver("sqlite3", orm.DRSqlite)
 	orm.RegisterDataBase("default", "sqlite3", "./data/dev/default.db")
-	orm.RegisterDataBase("oncdb", "sqlite3", "./data/dev/onc.db")
+	orm.RegisterDataBase("authdb", "sqlite3", "./data/dev/auth.db")
 
 }
 
@@ -47,7 +47,7 @@ func main() {
 
 	// orm.RunSyncdb needs to run at every startup
 	if db_boot == "true" {
-		name := "oncdb"
+		name := "authdb"
 		force := true
 		verbose := true
 		err := orm.RunSyncdb(name, force, verbose)
@@ -55,7 +55,7 @@ func main() {
 			fmt.Println(err)
 		}
 	} else {
-		name := "oncdb"
+		name := "authdb"
 		force := false
 		verbose := false
 		err := orm.RunSyncdb(name, force, verbose)

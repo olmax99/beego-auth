@@ -3,6 +3,7 @@ package controllers
 import (
 	"beego-auth/models"
 	pk "beego-auth/utilities/pbkdf2"
+	"log"
 
 	"encoding/hex"
 	"fmt"
@@ -14,9 +15,8 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/twinj/uuid"
 
-	"beego-auth/models"
-
 	beego "github.com/beego/beego/v2/server/web"
+	vault "github.com/olmax99/vaultgo"
 )
 
 // TODO separate all beego stuff: no need for testing
@@ -58,7 +58,7 @@ func (this *MainController) Login() {
 		o := orm.NewOrm()
 		// TODO Get databasename from config
 		// ..
-		o.Using("default")
+		o.Using("authdb")
 		user := models.AuthUser{Email: email}
 		err := o.Read(&user, "Email")
 		if err == nil {
@@ -131,12 +131,15 @@ func (this *MainController) Register() {
 		password := this.GetString("password")
 		password2 := this.GetString("password2")
 
+		// TODO implement https://gowalker.org/github.com/astaxie/beego/validation#ValidFormer:
+		// - Adjust user struct with valid tags
 		valid := validation.Validation{}
 		valid.Required(first, "first")
 		valid.Email(email, "email")
-		valid.MinSize(password, 6, "password")
+		valid.MinSize(password, 12, "password")
 		valid.Required(password2, "password2")
 		if valid.HasErrors() {
+			// return all recorded errors at once
 			errormap := []string{}
 			for _, err := range valid.Errors {
 				errormap = append(errormap, "Validation failed on "+err.Key+": "+err.Message+"\n")
@@ -149,21 +152,62 @@ func (this *MainController) Register() {
 			flash.Store(&this.Controller)
 			return
 		}
-		h := pk.HashPassword(password)
 
-		// Step 3: -------------- Save user info to database-------------------
+		// Step 2: -----------Get Vault Client--------------------------
+
+		vaddr, err := beego.GetConfig("String", "vault::address", "")
+		if err != nil {
+			fmt.Println(err)
+		}
+		ad := fmt.Sprintf("%v", vaddr)
+		if ad == "" {
+			fmt.Printf("ERROR [*] Vault address not found.")
+		}
+
+		client, err := vault.NewClient(ad, vault.WithCaPath(""))
+		if err != nil {
+			log.Fatal("PANIC [-] Could not connect with Vault")
+		}
+
+		// Step 3: ----------- Check for token--------------------------
+		if t := client.Token(); t == "" {
+			log.Print("WARNING [*] No token found in environment. Try config..")
+			vtok, err := beego.GetConfig("String", "vault::token", "")
+			if err != nil {
+				fmt.Println(err)
+			}
+			tok := fmt.Sprintf("%v", vtok)
+			if tok == "" {
+				log.Println("ERROR [*] Vault token not found.")
+			} else {
+				client.SetToken(tok)
+			}
+		}
+
+		// Step 4: ----------- Encrypt String and Write to DB----------
+		trans := client.Transit()
+		err = trans.Create("beego-key", &vault.TransitCreateOptions{})
+		if err != nil {
+			log.Printf("ERROR [*] Could not create Vault client.. %v", err)
+		}
+		// Step 5: -------------- Save user info to database--------------------
 		o := orm.NewOrm()
-		o.Using("default")
+		o.Using("authdb")
 
 		user := models.AuthUser{First: first, Last: last, Email: email}
-
-		// Convert password hash to string
-		user.Password = hex.EncodeToString(h.Hash) + hex.EncodeToString(h.Salt)
+		enc, err := trans.Encrypt("beego-key", &vault.TransitEncryptOptions{
+			Plaintext: password2,
+		})
+		if err != nil {
+			log.Printf("ERROR [*] Encrypt failed.. %v", err)
+		}
+		ps := string(enc.Data.Ciphertext)
+		user.Password = ps
 
 		// Add user to database with new uuid and
 		u := uuid.NewV4()
 		user.Reg_key = u.String()
-		_, err := o.Insert(&user)
+		_, err = o.Insert(&user)
 		if err != nil {
 			// TODO confirm if other errors need to be handled??
 			flash.Error(email + " already registered")
@@ -172,19 +216,20 @@ func (this *MainController) Register() {
 		}
 
 		// TODO sendgrid binding
-		// Step 4: --------------- Send verification email---------------------
+		// Step 6: --------------- Send verification email----------------------
 		// if !sendVerification(email, u.String()) {
 		// 	flash.Error("Unable to send verification email")
 		// 	flash.Store(&this.Controller)
 		// 	return
 		// }
 
-		// Step 5: --------------- Append confirmation to flash & redirect-----
+		// Step 7: --------------- Append confirmation to flash & redirect------
 		flash.Notice("Your account has been created. You must verify the account in your email.")
 		flash.Store(&this.Controller)
 		this.Redirect("/notice", 302)
 	}
 
+	// explicit render (can be omitted by setting: 'autorender = true')
 	err := this.Render()
 	if err != nil {
 		fmt.Println(err)
@@ -193,6 +238,7 @@ func (this *MainController) Register() {
 
 // Set verification attribute in current session context
 func (this *MainController) Verify() {
+	// ----------------------------- GET--------------------------------------------
 	this.activeContent("user/verify")
 
 	u := this.Ctx.Input.Param(":uuid")
