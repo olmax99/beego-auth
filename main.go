@@ -1,73 +1,64 @@
 package main
 
 import (
-	_ "beego-auth/models"
-	_ "beego-auth/routers"
 	"fmt"
 	"os"
 
-	"github.com/astaxie/beego/orm"
+	"beego-auth/conf"
+	"beego-auth/models"
+	_ "beego-auth/routers"
+
+	"github.com/beego/beego/v2/adapter/orm"
 	beego "github.com/beego/beego/v2/server/web"
 	_ "github.com/mattn/go-sqlite3"
-
-	"github.com/beego/beego/v2/core/config"
 )
 
 func init() {
-	// Create DB
+	dbalias, err := beego.AppConfig.String("db::beego_db_alias")
+	if err != nil {
+		fmt.Println(err)
+	}
+
 	os.MkdirAll("./data/dev/", 0755)
-	os.Create("./data/dev/auth.db")
 
 	orm.RegisterDriver("sqlite3", orm.DRSqlite)
 	orm.RegisterDataBase("default", "sqlite3", "./data/dev/default.db")
-	orm.RegisterDataBase("authdb", "sqlite3", "./data/dev/auth.db")
-
+	if dbalias != "default" {
+		orm.RegisterDataBase(dbalias, "sqlite3", "./data/dev/"+dbalias+".db")
+	}
+	orm.RegisterModel(new(models.AuthUser))
 }
 
 func main() {
-	// TODO config + RunSyncDb to func initDb()
-	// Load configs
-	iniconf, err := config.NewConfig("ini", "conf/app.conf")
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	db_boot, err := iniconf.String("db::beego_db_bootstrap")
-	if err != nil {
-		fmt.Println(err)
-	}
-	db_debug, err := iniconf.String("db::beego_db_debug")
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	if db_debug == "true" {
+	force := false
+	verbose := false
+	beeC := conf.BeeConf(
+		"db::beego_db_alias",
+		"db::beego_db_bootstrap",
+		"db::beego_db_debug",
+		"vault::beego_vault_token",
+	)
+	if beeC["beego_db_debug"] == "true" {
 		orm.Debug = true
 	}
-
-	// orm.RunSyncdb needs to run at every startup
-	if db_boot == "true" {
-		name := "authdb"
-		force := true
-		verbose := true
-		err := orm.RunSyncdb(name, force, verbose)
-		if err != nil {
-			fmt.Println(err)
-		}
-	} else {
-		name := "authdb"
-		force := false
-		verbose := false
-		err := orm.RunSyncdb(name, force, verbose)
-		if err != nil {
-			fmt.Println(err)
-		}
+	if beeC["beego_db_bootstrap"] == "true" {
+		force = true
+		verbose = true
 	}
-
-	// Enable cmd: orm syncdb
+	name := beeC["beego_db_alias"]
+	err := orm.RunSyncdb(name, force, verbose)
+	if err != nil {
+		fmt.Println(err)
+	}
 	orm.RunCommand()
 
 	beego.BConfig.WebConfig.Session.SessionOn = true
+
+	// hard requirement check
+	if beeC["beego_vault_token"] == "empty" || beeC["beego_sg_api_key"] == "empty" {
+		fmt.Printf("PANIC [*] Config: Vault token required.. %v", err)
+		os.Exit(1)
+	}
 	beego.Run()
 
 }

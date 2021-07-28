@@ -2,11 +2,9 @@ package models
 
 import (
 	"time"
-
-	"github.com/astaxie/beego/orm"
 )
 
-//
+// Reg_key: determining user verification, i.e. Reg_key = "" -> user.Verified
 type AuthUser struct {
 	Id       int
 	First    string
@@ -15,10 +13,4 @@ type AuthUser struct {
 	Password string
 	Reg_key  string
 	Reg_date time.Time `orm:"auto_now_add;type(datetime)"`
-}
-
-func init() {
-
-	orm.RegisterModel(new(AuthUser))
-
 }

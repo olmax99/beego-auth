@@ -14,18 +14,25 @@ First beego trial iteration:
 
 * Getting Started
 ** Run Main
+- Create =.beego.env= 
 #+begin_src bash
-export VAULT_ADDR='http://127.0.0.1:8200'
-export BEEGO_VAULT_TOKEN=***
+export BEEGO_DB_ALIAS="auth"
+export BEEGO_VAULT_TOKEN=`cat vault_root_dev.key`
+export BEEGO_SENDGRID_OWN_SUPPORT=support@<sendgrid-verified>.domain
+export BEEGO_SENDGRID_API_KEY=`cat sendgrid_api_key`
+#+end_src
 
+- Run =beego-auth=
+#+begin_src bash
+$ source beego.env
 $ go build
-$ ./beego-vault
+$ ./beego-auth
 #+end_src
 
 * Commands
 #+begin_src bash
 ./beego-auth orm syncdb -h
-./beego-auth orm syncdb -db "authdb" -force=true -v=true
+./beego-auth orm syncdb -db "auth" -force=true -v=true
 #+end_src
 
 * Testing
