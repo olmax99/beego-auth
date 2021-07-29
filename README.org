@@ -24,7 +24,7 @@ export BEEGO_SENDGRID_API_KEY=`cat sendgrid_api_key`
 
 - Run =beego-auth=
 #+begin_src bash
-$ source beego.env
+$ source .beego.env
 $ go build
 $ ./beego-auth
 #+end_src

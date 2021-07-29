@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html/template"
 	"log"
+	"os"
 	"strings"
 	"time"
 
@@ -213,6 +214,7 @@ func (this *MainController) Register() {
 		_, err = o.Insert(user)
 		if err != nil {
 			// TODO confirm if other errors need to be handled??
+			// TODO This Error returns blank page <- capture error notice
 			flash.Error(email + " already registered")
 			flash.Store(&this.Controller)
 			return
@@ -220,7 +222,7 @@ func (this *MainController) Register() {
 
 		// Step 6: --------------- Send verification email----------------------
 		// TODO Verify successfully send (webhook??)
-		if !sendVerification(user.Email, u.String(), beeC) {
+		if !sendVerification(user, u.String(), beeC) {
 			flash.Error("Unable to send verification email")
 			flash.Store(&this.Controller)
 			return
@@ -241,36 +243,23 @@ func (this *MainController) Register() {
 
 // TODO Creating Email templates might go into a separate package or folder within controller
 // verification email after user registered
-func sendVerification(user_addr, uid string, conf map[string]string) bool {
+func sendVerification(authusr *models.AuthUser, uid string, conf map[string]string) bool {
 	// Step 1: -------------------- Prepare html---------------------------------
+	log.Printf("INFO [*] sendVerification link: %v", conf["httpport"])
 	link := "http://localhost:" + conf["httpport"] + "/user/verify/" + uid
-	const tpl = `
-<!DOCTYPE html>
-<html>
-	<body>
-                <title>{{.Title}}</title>
-
-                To verify your account, please click on the link: 
-                <a href="{{.Link}}">Verify my account.</a>
-		{{range .Items}}<div>{{ . }}</div>{{else}}<div><strong>no rows</strong></div>{{end}}
-                <br><br>Best Regards,<br>Your Support Team
-	</body>
-</html>`
-
-	t, err := template.New("verification").Parse(tpl)
+	pwd, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
+	t, err := template.New("verification.tpl").ParseFiles(pwd + "/controllers/html/verification.tpl")
 	if err != nil {
 		log.Printf("ERROR [*] Parse html failed.. %v", err)
 	}
 	data := struct {
-		Title string
-		Items []string
-		Link  string
+		User string
+		Link string
 	}{
-		Title: "My page",
-		Items: []string{
-			"My photos",
-			"My blog",
-		},
+		User: string(authusr.First),
 		Link: link,
 	}
 
@@ -284,7 +273,7 @@ func sendVerification(user_addr, uid string, conf map[string]string) bool {
 	// Step 2: -------------------- Send Email-----------------------------------
 	from := mail.NewEmail("Your Support Team", conf["beego_sg_own_support"])
 	subject := "Sending with SendGrid: html content"
-	to := mail.NewEmail("Peter Pan", user_addr)
+	to := mail.NewEmail("Peter Pan", string(authusr.Email))
 	htmlContent := content
 	message := mail.NewSingleEmail(from, subject, to, "", htmlContent)
 
@@ -302,7 +291,6 @@ func sendVerification(user_addr, uid string, conf map[string]string) bool {
 	return true
 }
 
-// Set verification attribute in current session context
 func (this *MainController) Verify() {
 	// ----------------------------- GET--------------------------------------------
 	this.activeContent("user/verify")
@@ -316,8 +304,8 @@ func (this *MainController) Verify() {
 	o.Using(beeC["beego_db_alias"])
 
 	// Get user from data base by filtering on uuid
-	user := models.AuthUser{Reg_key: u}
-	err := o.Read(&user, "Reg_key")
+	user := &models.AuthUser{Reg_key: u}
+	err := o.Read(user, "Reg_key")
 	if err == nil {
 		this.Data["Verified"] = 1
 		// Remove registration key after context has 'Verified=1'
