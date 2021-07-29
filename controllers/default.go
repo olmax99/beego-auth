@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"beego-auth/conf"
 	"fmt"
 
 	beego "github.com/beego/beego/v2/server/web"
@@ -19,11 +20,11 @@ type MainController struct {
 
 // active Content is building the html output from the appropriate templates
 func (this *MainController) activeContent(view string) {
-	httpport, err := beego.AppConfig.String("httpport")
-	if err != nil {
-		fmt.Println(err)
-	}
-	this.Data["Httpport"] = httpport
+	beeC := conf.BeeConf(
+		"httpport",
+		"sessionname",
+	)
+	this.Data["Httpport"] = beeC["httpport"]
 
 	this.Layout = "basic-layout.tpl"
 	this.LayoutSections = make(map[string]string)
@@ -32,7 +33,7 @@ func (this *MainController) activeContent(view string) {
 	this.TplName = view + ".tpl"
 
 	// All sessions are created in c.user.Login(): this.SetSession("<name>")
-	sess := this.GetSession("auth")
+	sess := this.GetSession(beeC["sessionname"])
 	// if the user is logged in (--> there is a non-nil session),
 	// then we set the InSession parameter to a value (any value),
 	// which tells the templating engine to use the “Welcome” bar instead of “Login”.
@@ -47,8 +48,13 @@ func (this *MainController) activeContent(view string) {
 func (this *MainController) Get() {
 	this.activeContent("index")
 
-	//----------- This page requires login----------------
-	sess := this.GetSession("auth")
+	beeC := conf.BeeConf(
+		"sessionname",
+	)
+	//////////////////////////////
+	// This page requires login //
+	//////////////////////////////
+	sess := this.GetSession(beeC["sessionname"])
 	if sess == nil {
 		this.Redirect("/user/login/home", 302)
 		return

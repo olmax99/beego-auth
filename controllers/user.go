@@ -30,7 +30,6 @@ import (
 func (this *MainController) Login() {
 	// ----------------------------GET ---------------------------------------------
 	this.activeContent("user/login")
-
 	// 'back' storing the path which was requested before refered here (<-- no session)
 	// allow for deeper URL such as l1/l2/l3 represented by l1>l2>l3
 	back := strings.Replace(this.Ctx.Input.Param(":back"), ">", "/", -1)
@@ -40,6 +39,15 @@ func (this *MainController) Login() {
 	if this.Ctx.Input.Method() == "POST" {
 		// Step 1: -----------Validate Form input--------------------------------
 		flash := beego.NewFlash()
+
+		beeC := conf.BeeConf(
+			"sessionname",
+			"db::beego_db_alias",
+			"vault::beego_vault_transit_key",
+			"vault::beego_vault_address",
+			"vault::beego_vault_token",
+		)
+
 		email := this.GetString("email")
 		password := this.GetString("password")
 
@@ -54,24 +62,23 @@ func (this *MainController) Login() {
 			this.Data["Errors"] = errormap
 			return
 		}
-		fmt.Println("INFO [*] Authorization is", email, ":", password)
 
-		// Step 2: -------------Read password hash from database-----------------
-		var x pk.PasswordHash
-
-		x.Hash = make([]byte, 32)
-		x.Salt = make([]byte, 16)
-
-		dbalias, err := beego.AppConfig.String("db::beego_db_alias")
-		if err != nil {
-			fmt.Printf("ERROR [*] Index.dbalias.. %v", err)
-		}
+		// Step 2: ----------- Read String from DB and Decrypt------------------
 		o := orm.NewOrm()
-		o.Using(dbalias)
-		user := models.AuthUser{Email: email}
-		err = o.Read(&user, "Email")
-		if err == nil {
-			// Verify will remove uuid from user, hence if it still exists
+		o.Using(beeC["beego_db_alias"])
+		user := &models.AuthUser{Email: email}
+		switch err := o.Read(user, "Email"); {
+		case err == orm.ErrNoRows:
+			log.Printf("ERROR [*] No result found.. %v", err)
+			return
+		case err == orm.ErrMissPK:
+			log.Printf("ERROR [*] No primary key found.. %v", err)
+			return
+		case err != nil:
+			log.Printf("ERROR [*] Something else went wrong.. %v", err)
+			return
+		case err == nil:
+			// Verify() will remove uuid from user, hence if it still exists
 			// it indicates that account verification (email) has not been
 			// completed
 			if user.Reg_key != "" {
@@ -80,36 +87,51 @@ func (this *MainController) Login() {
 				return
 			}
 
-			// scan in the password hash/salt
-			fmt.Println("Password to scan:", user.Password)
-			if x.Hash, err = hex.DecodeString(user.Password[:64]); err != nil {
-				fmt.Println("ERROR [-] ..", err)
+			// Step 3: -----------Get Vault Client--------------------------
+			client, err := vault.NewClient(beeC["beego_vault_address"], vault.WithCaPath(""))
+			if err != nil {
+				log.Println("PANIC [-] Could not connect with Vault")
 			}
-			if x.Salt, err = hex.DecodeString(user.Password[64:]); err != nil {
-				fmt.Println("ERROR [-] ..", err)
+
+			// Step 4: ----------- Check for token--------------------------
+			if t := client.Token(); t == "" {
+				log.Println("WARNING [*] No token found in environment. Try config..")
+				client.SetToken(beeC["beego_vault_token"])
 			}
-			fmt.Println("INFO [*] decoded password is", x)
-		} else {
+
+			trans := client.Transit()
+			err = trans.Create(beeC["beego_vault_transit_key"], &vault.TransitCreateOptions{})
+			if err != nil {
+				log.Printf("ERROR [*] Could not create Vault client.. %v", err)
+			}
+			dec, err := trans.Decrypt(beeC["beego_vault_transit_key"], &vault.TransitDecryptOptions{
+				Ciphertext: user.Password,
+			})
+			if err != nil {
+				log.Printf("ERROR [*] Decrypt failed.. %v", err)
+			}
+			// Step 5: ----------- Compare password with db--------
+			if dec.Data.Plaintext != password {
+				log.Println("WARNING [*] Login passwords do not match.")
+				flash.Error("Bad password")
+				flash.Store(&this.Controller)
+				return
+			}
+		default:
 			flash.Error("No such user/email")
 			flash.Store(&this.Controller)
 			return
 		}
 
-		// Step 3: ------------- Compare submitted password with database--------
-		if !pk.MatchPassword(password, &x) {
-			flash.Error("Bad password")
-			flash.Store(&this.Controller)
-			return
-		}
-
-		// Step 4: ------------ Create session and go back to previous page------
+		// Step 6: ------------ Create session and go back to previous page------
 		m := make(map[string]interface{})
 		m["first"] = user.First
 		m["username"] = email
 		m["timestamp"] = time.Now()
-		this.SetSession("auth", m)
+		this.SetSession(beeC["sessionname"], m)
 		this.Redirect("/"+back, 302)
 	}
+
 	err := this.Render()
 	if err != nil {
 		fmt.Println(err)
@@ -117,8 +139,12 @@ func (this *MainController) Login() {
 }
 
 func (this *MainController) Logout() {
+	beeC := conf.BeeConf(
+		"sessionname",
+	)
+
 	this.activeContent("logout")
-	this.DelSession("auth")
+	this.DelSession(beeC["sessionname"])
 	this.Redirect("/home", 302)
 
 	err := this.Render()
@@ -141,6 +167,7 @@ func (this *MainController) Register() {
 			"db::beego_db_alias",
 			"vault::beego_vault_address",
 			"vault::beego_vault_token",
+			"vault::beego_vault_transit_key",
 			"sendgrid::beego_sg_own_support",
 			"sendgrid::beego_sg_api_key",
 		)
@@ -187,7 +214,7 @@ func (this *MainController) Register() {
 
 		// Step 4: ----------- Encrypt String and Write to DB----------
 		trans := client.Transit()
-		err = trans.Create("beego-key", &vault.TransitCreateOptions{})
+		err = trans.Create(beeC["beego_vault_transit_key"], &vault.TransitCreateOptions{})
 		if err != nil {
 			log.Printf("ERROR [*] Could not create Vault client.. %v", err)
 		}
@@ -199,7 +226,7 @@ func (this *MainController) Register() {
 		user.First = first
 		user.Last = last
 		user.Email = email
-		enc, err := trans.Encrypt("beego-key", &vault.TransitEncryptOptions{
+		enc, err := trans.Encrypt(beeC["beego_vault_transit_key"], &vault.TransitEncryptOptions{
 			Plaintext: password2,
 		})
 		if err != nil {
@@ -241,11 +268,9 @@ func (this *MainController) Register() {
 	}
 }
 
-// TODO Creating Email templates might go into a separate package or folder within controller
 // verification email after user registered
 func sendVerification(authusr *models.AuthUser, uid string, conf map[string]string) bool {
 	// Step 1: -------------------- Prepare html---------------------------------
-	log.Printf("INFO [*] sendVerification link: %v", conf["httpport"])
 	link := "http://localhost:" + conf["httpport"] + "/user/verify/" + uid
 	pwd, err := os.Getwd()
 	if err != nil {
@@ -326,10 +351,15 @@ func (this *MainController) Profile() {
 	// ----------------------------- GET--------------------------------------------
 	this.activeContent("user/profile")
 
+	beeC := conf.BeeConf(
+		"sessionname",
+		"db::beego_db_alias",
+	)
+
 	//////////////////////////////
 	// This page requires login //
 	//////////////////////////////
-	sess := this.GetSession("auth")
+	sess := this.GetSession(beeC["sessionname"])
 	if sess == nil {
 		this.Redirect("/user/login/home", 302)
 		return
@@ -346,9 +376,9 @@ func (this *MainController) Profile() {
 	x.Salt = make([]byte, 16)
 
 	o := orm.NewOrm()
-	o.Using("authdb")
-	user := models.AuthUser{Email: m["username"].(string)}
-	err := o.Read(&user, "Email")
+	o.Using(beeC["beego_db_alias"])
+	user := &models.AuthUser{Email: m["username"].(string)}
+	err := o.Read(user, "Email")
 	if err == nil {
 		// scan in the password hash/salt (see POST 'Step 2' for current
 		// password validation
@@ -369,7 +399,7 @@ func (this *MainController) Profile() {
 		this.Data["First"] = user.First
 		this.Data["Last"] = user.Last
 		this.Data["Email"] = user.Email
-	}(this, &user)
+	}(this, user)
 
 	// ----------------------------- POST-------------------------------------------
 	// Profile can be used to update user profile data
@@ -455,10 +485,15 @@ func (this *MainController) Remove() {
 	// ----------------------------- GET------------------------------------------
 	this.activeContent("user/remove")
 
+	beeC := conf.BeeConf(
+		"sessionname",
+		"db::beego_db_alias",
+	)
+
 	//////////////////////////////
 	// This page requires login //
 	//////////////////////////////
-	sess := this.GetSession("acme")
+	sess := this.GetSession(beeC["sessionname"])
 	if sess == nil {
 		this.Redirect("/user/login/home", 302)
 		return
@@ -489,9 +524,9 @@ func (this *MainController) Remove() {
 		x.Salt = make([]byte, 16)
 
 		o := orm.NewOrm()
-		o.Using("default")
-		user := models.AuthUser{Email: m["username"].(string)}
-		err := o.Read(&user, "Email")
+		o.Using(beeC["beego_db_alias"])
+		user := &models.AuthUser{Email: m["username"].(string)}
+		err := o.Read(user, "Email")
 		if err == nil {
 			if x.Hash, err = hex.DecodeString(user.Password[:64]); err != nil {
 				fmt.Println("ERROR:", err)

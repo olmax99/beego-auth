@@ -8,3 +8,6 @@
 /conf
 /static
 /media
+/.beego.env
+/beego-auth
+/data

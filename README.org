@@ -16,6 +16,7 @@ First beego trial iteration:
 ** Run Main
 - Create =.beego.env= 
 #+begin_src bash
+export VAULT_ADDR='http://127.0.0.1:8200'
 export BEEGO_DB_ALIAS="auth"
 export BEEGO_VAULT_TOKEN=`cat vault_root_dev.key`
 export BEEGO_SENDGRID_OWN_SUPPORT=support@<sendgrid-verified>.domain
