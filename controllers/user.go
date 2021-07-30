@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"beego-auth/conf"
@@ -26,6 +27,46 @@ import (
 	pk "beego-auth/utilities/pbkdf2"
 )
 
+// Container for retrieving decrypted strings via Vault Transit
+type VaultDecryptVal struct {
+	vaultv1 string
+	value   string
+	lock    sync.RWMutex
+}
+
+// returns the container with the decrypted user password
+func (vdv *VaultDecryptVal) Set(beeCfg map[string]string) error {
+	vdv.lock.Lock()
+	defer vdv.lock.Unlock()
+	client, err := vault.NewClient(beeCfg["beego_vault_address"], vault.WithCaPath(""))
+	if err != nil {
+		log.Println("PANIC [-] Could not connect with Vault")
+		return err
+	}
+
+	// Step 4: ----------- Check for token--------------------------
+	if t := client.Token(); t == "" {
+		log.Println("WARNING [*] No token found in environment. Try config..")
+		client.SetToken(beeCfg["beego_vault_token"])
+	}
+
+	trans := client.Transit()
+	err = trans.Create(beeCfg["beego_vault_transit_key"], &vault.TransitCreateOptions{})
+	if err != nil {
+		log.Printf("ERROR [*] Could not create Vault client.. %v", err)
+		return err
+	}
+	v, err := trans.Decrypt(beeCfg["beego_vault_transit_key"], &vault.TransitDecryptOptions{
+		Ciphertext: vdv.vaultv1,
+	})
+	vdv.value = v.Data.Plaintext
+	if err != nil {
+		log.Printf("ERROR [*] Decrypt failed.. %v", err)
+		return err
+	}
+	return nil
+}
+
 // TODO separate all beego stuff: no need for testing
 func (this *MainController) Login() {
 	// ----------------------------GET ---------------------------------------------
@@ -37,7 +78,7 @@ func (this *MainController) Login() {
 
 	// -----------------------------POST --------------------------------------------
 	if this.Ctx.Input.Method() == "POST" {
-		// Step 1: -----------Validate Form input--------------------------------
+
 		flash := beego.NewFlash()
 
 		beeC := conf.BeeConf(
@@ -48,6 +89,7 @@ func (this *MainController) Login() {
 			"vault::beego_vault_token",
 		)
 
+		// Step 1: -----------Validate Form input--------------------------------
 		email := this.GetString("email")
 		password := this.GetString("password")
 
@@ -351,9 +393,14 @@ func (this *MainController) Profile() {
 	// ----------------------------- GET--------------------------------------------
 	this.activeContent("user/profile")
 
+	flash := beego.NewFlash()
+
 	beeC := conf.BeeConf(
 		"sessionname",
 		"db::beego_db_alias",
+		"vault::beego_vault_address",
+		"vault::beego_vault_token",
+		"vault::beego_vault_transit_key",
 	)
 
 	//////////////////////////////
@@ -367,31 +414,43 @@ func (this *MainController) Profile() {
 	m := sess.(map[string]interface{})
 
 	// Step 1:---------- Read current password hash from database-----------------
-	flash := beego.NewFlash()
-
-	// TODO redo with Vault logic
-	var x pk.PasswordHash
-
-	x.Hash = make([]byte, 32)
-	x.Salt = make([]byte, 16)
-
+	d := &VaultDecryptVal{}
 	o := orm.NewOrm()
 	o.Using(beeC["beego_db_alias"])
 	user := &models.AuthUser{Email: m["username"].(string)}
-	err := o.Read(user, "Email")
-	if err == nil {
-		// scan in the password hash/salt (see POST 'Step 2' for current
-		// password validation
-		if x.Hash, err = hex.DecodeString(user.Password[:64]); err != nil {
-			fmt.Println("ERROR:", err)
-		}
-		if x.Salt, err = hex.DecodeString(user.Password[64:]); err != nil {
-			fmt.Println("ERROR:", err)
-		}
-	} else {
-		flash.Error("Internal error")
+	switch err := o.Read(user, "Email"); {
+	case err == orm.ErrNoRows:
+		log.Printf("ERROR [*] No result found.. %v", err)
+		flash.Error("No such user/email")
 		flash.Store(&this.Controller)
 		return
+	case err == orm.ErrMissPK:
+		log.Printf("ERROR [*] No primary key found.. %v", err)
+		flash.Error("No such user/email")
+		flash.Store(&this.Controller)
+		return
+	case err != nil:
+		log.Printf("ERROR [*] Something else went wrong.. %v", err)
+		flash.Error("No such user/email")
+		flash.Store(&this.Controller)
+		return
+	case err == nil:
+		// Verify() will remove uuid from user, hence if it still exists
+		// it indicates that account verification (email) has not been
+		// completed
+		if user.Reg_key != "" {
+			flash.Error("Account not verified")
+			flash.Store(&this.Controller)
+			return
+		}
+		d.vaultv1 = user.Password
+		if err := d.Set(beeC); err != nil {
+			log.Printf("ERROR [*] VaultDecryptVal.Set().. %v", err)
+		}
+
+		this.Data["First"] = user.First
+		this.Data["Last"] = user.Last
+		this.Data["Email"] = user.Email
 	}
 
 	// this deferred function ensures that the correct fields from the database are displayed
@@ -416,12 +475,16 @@ func (this *MainController) Profile() {
 		valid.Email(email, "email")
 		valid.Required(current, "current")
 		if valid.HasErrors() {
+			log.Printf("ERROR [*] .. probably password missing..")
 			errormap := []string{}
 			for _, err := range valid.Errors {
 				errormap = append(errormap, "Validation failed on "+err.Key+": "+err.Message+"\n")
 			}
 			this.Data["Errors"] = errormap
-			return
+			errR := this.Render()
+			if errR != nil {
+				fmt.Println(errR)
+			}
 		}
 
 		if password != "" {
@@ -441,17 +504,11 @@ func (this *MainController) Profile() {
 				flash.Store(&this.Controller)
 				return
 			}
-			h := pk.HashPassword(password)
-
-			// Convert password hash to string
-			user.Password = hex.EncodeToString(h.Hash) + hex.EncodeToString(h.Salt)
 		}
-
-		// TODO redo logic for using Vault
 		// Step 2:---------- Compare submitted password with database---------
 		// Ensure that controller drops out if current password does not match
 		// with DB
-		if !pk.MatchPassword(current, &x) {
+		if current != d.value {
 			flash.Error("Bad current password")
 			flash.Store(&this.Controller)
 			return
@@ -462,7 +519,7 @@ func (this *MainController) Profile() {
 		user.Last = last
 		user.Email = email
 
-		_, err := o.Update(&user)
+		_, err := o.Update(user)
 		if err == nil {
 			flash.Notice("Profile updated")
 			flash.Store(&this.Controller)
@@ -476,7 +533,7 @@ func (this *MainController) Profile() {
 
 	// explicit render (can be omitted by setting: 'autorender = true')
 	errR := this.Render()
-	if err != nil {
+	if errR != nil {
 		fmt.Println(errR)
 	}
 }
