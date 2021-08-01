@@ -13,6 +13,7 @@ func init() {
 	beego.Router("/user/register", &controllers.MainController{}, "get,post:Register")
 	beego.Router("/user/profile", &controllers.MainController{}, "get,post:Profile")
 	beego.Router("/user/verify/:uuid([0-9A-Fa-f]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89ABab][0-9a-fA-F]{3}-[a-fA-F0-9]{12}$)", &controllers.MainController{}, "get:Verify")
+	beego.Router("/user/cancel/:uuid([0-9A-Fa-f]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89ABab][0-9a-fA-F]{3}-[a-fA-F0-9]{12}$)", &controllers.MainController{}, "get:Cancel")
 	beego.Router("/user/remove", &controllers.MainController{}, "get,post:Remove")
 	beego.Router("/notice", &controllers.MainController{}, "get:Notice")
 

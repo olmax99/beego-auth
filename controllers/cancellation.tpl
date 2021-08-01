@@ -118,7 +118,7 @@ op" align="left"><a href="http://links.twilio.com/Mjk0LVRLQi0zMDAAAAF-jUOv1pbDzA
 <table style="box-sizing: border-box; width: 100%; border-spacing: 0; mso-table-rspace: 0pt; mso-table-lspace: 0pt; border-collapse: separate !important;" width="100%">
 <tbody>
 <tr>
-<td style="box-sizing: border-box; padding: 0; font-family: 'Open Sans', 'Helvetica Neue', 'Helvetica', Helvetica, Arial, sans-serif; font-size: 16px; vertical-align: top;" valign="top"> <p style="margin: 20px 10px 0px; color: #294661; font-family: &quot;Open Sans&quot;,&quot;Helvetica Neue&quot;,&quot;Helvetica&quot;,Helvetica,Arial,sans-serif; font-size: 16px; font-weight: 300; text-align: left;">Hi {{.User}}, <br><br>Congrats on sending your first Twilio SendGrid email! You still have some steps to complete in your account that enable you to upgrade and lift your current email sending limits.<br><br> <i>Click on the checkboxes below to learn more about each task.</i></p> </td>
+<td style="box-sizing: border-box; padding: 0; font-family: 'Open Sans', 'Helvetica Neue', 'Helvetica', Helvetica, Arial, sans-serif; font-size: 16px; vertical-align: top;" valign="top"> <p style="margin: 20px 10px 0px; color: #294661; font-family: &quot;Open Sans&quot;,&quot;Helvetica Neue&quot;,&quot;Helvetica&quot;,Helvetica,Arial,sans-serif; font-size: 16px; font-weight: 300; text-align: left;">Hi {{.User}}, <br><br>Please confirm the cancellation of your account. Within the next 7 days you will be able to reactivate your account.After that your account is removed, and it will not be possible to create a new account with the same email address.<br><br> <i>Click on the checkboxes below to learn more about each task.</i></p> </td>
 </tr>
 </tbody>
 </table> </td>
@@ -264,7 +264,7 @@ ox; ">
 <td style="box-sizing: border-box; padding-top: 30px; padding: 0; font-family: 'Open Sans', 'Helvetica Neue', 'Helvetica', Helvetica, Arial, sans-serif; font-size: 16px; vertical-align: top; background-color: #348eda; border-radius: 2px; text-align: center;" valign="top" bgcolor="#348EDA" align="center">
 <div class="mktEditable" id="primary-button" style="box-sizing: border-box;">
 <div>
-<a href="{{.Link}}" style="box-sizing: border-box; border-color: #348eda; font-weight: 400; text-decoration: none; display: inline-block; margin: 0; color: #ffffff; background-color: #348eda; border: solid 1px #348eda; border-radius: 2px; cursor: pointer; font-size: 14px; padding: 12px 45px;" target="_blank">Login to Complete Your Checklist</a>
+<a href="{{.Link}}" style="box-sizing: border-box; border-color: #348eda; font-weight: 400; text-decoration: none; display: inline-block; margin: 0; color: #ffffff; background-color: #348eda; border: solid 1px #348eda; border-radius: 2px; cursor: pointer; font-size: 14px; padding: 12px 45px;" target="_blank">Confirm Account Cancellation.</a>
 </div>
 </div> </td>
 </tr>

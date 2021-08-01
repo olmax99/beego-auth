@@ -1,5 +1,5 @@
 <div id="content">
-<h1>Please login</h1>
+<h1>Welcome.</h1>
 &nbsp;
 {{if .flash.error}}
 <h3>{{.flash.error}}</h3>

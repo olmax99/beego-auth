@@ -13,4 +13,6 @@ type AuthUser struct {
 	Password string
 	Reg_key  string
 	Reg_date time.Time `orm:"auto_now_add;type(datetime)"`
+	Active   string    `orm:"null"`
+	Clc_date time.Time `orm:"null"`
 }

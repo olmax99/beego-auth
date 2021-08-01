@@ -12,7 +12,7 @@
 <div id="header">
         <div align="right">
              {{if .InSession}}
-             Welcome, {{.First}} [<a href="http://localhost:{{.Httpport}}/logout">Logout</a>|<a href="http://localhost:{{.Httpport}}/user/profile">Profile</a>]
+             Welcome, {{.First}} [<a href="http://localhost:{{.Httpport}}/user/logout">Logout</a>|<a href="http://localhost:{{.Httpport}}/user/profile">Profile</a>]
              {{else}}
              [<a href="http://localhost:{{.Httpport}}/user/login/home">Login</a>]
              {{end}}
