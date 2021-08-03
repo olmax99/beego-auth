@@ -14,6 +14,7 @@ import (
 
 	"github.com/astaxie/beego/validation"
 	"github.com/beego/beego/v2/adapter/orm"
+	"github.com/beego/beego/v2/adapter/utils"
 	"github.com/twinj/uuid"
 
 	beego "github.com/beego/beego/v2/server/web"
@@ -62,63 +63,32 @@ func (this *MainController) Login() {
 			}
 		}
 
-		// Step 2: ----------- Read User Password from DB and Decrypt------------
+		// Step 2: ----------- Read User Password from DB and Decrypt----------
 		crypt := NewCrypter(beeC)
-		o := orm.NewOrm()
-		o.Using(beeC["beego_db_alias"])
-		user := &models.AuthUser{Email: email}
-		err := o.Read(user, "Email")
-		if err != nil {
-			switch errM := err.Error(); {
-			case errM == orm.ErrNoRows.Error():
-				log.Printf("ERROR [*] No result found.. %v", err)
-				flash.Error("No such user/email")
-				flash.Store(&this.Controller)
-				errR := this.Render()
-				if errR != nil {
-					fmt.Println(errR)
-				}
-			case errM == orm.ErrMissPK.Error():
-				log.Printf("ERROR [*] No primary key found.. %v", err)
-				flash.Error("No such user/email")
-				flash.Store(&this.Controller)
-				errR := this.Render()
-				if errR != nil {
-					fmt.Println(errR)
-				}
-			default:
-				log.Printf("ERROR [*] Something else went wrong.. %r, %v", err, orm.ErrNoRows.Error())
-				flash.Error("No such user/email")
-				flash.Store(&this.Controller)
-				errR := this.Render()
-				if errR != nil {
-					fmt.Println(errR)
-				}
+		user := this.ReadAuthUser(email, beeC["beego_db_alias"])()
+
+		// Verify() will remove uuid from user, hence if it still exists
+		// it indicates that account verification (email) has not been
+		// completed
+		if user.Reg_key != "" || user.Active != "" {
+			flash.Error("Account not active.")
+			flash.Store(&this.Controller)
+			errR := this.Render()
+			if errR != nil {
+				fmt.Println(errR)
 			}
-		} else {
-			// Verify() will remove uuid from user, hence if it still exists
-			// it indicates that account verification (email) has not been
-			// completed
-			if user.Reg_key != "" || user.Active != "" {
-				flash.Error("Account not active.")
-				flash.Store(&this.Controller)
-				errR := this.Render()
-				if errR != nil {
-					fmt.Println(errR)
-				}
-			}
-			// Step 5: ----------- Compare password with db--------
-			crypt.vaultv1 = user.Password
-			if err := crypt.De(); err != nil {
-				log.Printf("ERROR [*] VaultDecryptVal.Set().. %v", err)
-			}
-			if crypt.value != password {
-				flash.Error("Bad password")
-				flash.Store(&this.Controller)
-				errR := this.Render()
-				if errR != nil {
-					fmt.Println(errR)
-				}
+		}
+		// Step 5: ----------- Compare password with db--------
+		crypt.vaultv1 = user.Password
+		if err := crypt.De(); err != nil {
+			log.Printf("ERROR [*] VaultDecryptVal.Set().. %v", err)
+		}
+		if crypt.value != password {
+			flash.Error("Bad password")
+			flash.Store(&this.Controller)
+			errR := this.Render()
+			if errR != nil {
+				fmt.Println(errR)
 			}
 		}
 		// Step 6: ------------ Create session and go back to previous page------
@@ -278,7 +248,7 @@ func (this *MainController) Verify() {
 	// explicit render (can be omitted by setting: 'autorender = true')
 	errR := this.Render()
 	if errR != nil {
-		fmt.Println(err)
+		fmt.Println(errR)
 	}
 }
 
@@ -325,6 +295,141 @@ func (this *MainController) Cancel() {
 	}
 }
 
+func (this *MainController) Genpass1() {
+	// ----------------------------- GET--------------------------------------------
+	// TODO Improve by both reading uuid and allow user to post his current password
+	// At this point it was not clear on how to combine those two
+
+	flash := beego.NewFlash()
+
+	beeC := conf.BeeConf(
+		"sessionname",
+		"db::beego_db_alias",
+	)
+	u := this.Ctx.Input.Param(":uuid")
+
+	o := orm.NewOrm()
+	o.Using(beeC["beego_db_alias"])
+	user := &models.AuthUser{Reset: u}
+	err := o.Read(user, "Reset")
+	if err == nil || user.Reset == u {
+		// set the 24h limit for next passwd reset
+		user.Rst_date = time.Now().UTC()
+		if _, err := o.Update(user); err != nil {
+			log.Printf("Error [*] Genpass1 Rst_date.. %v", err)
+			flash.Notice("You can now login with your temporary password.")
+			flash.Store(&this.Controller)
+			this.Redirect("/notice", 302)
+		}
+		// Step 2: ----------- Create new session---------------------------
+		m := make(map[string]interface{})
+		m["first"] = user.First
+		m["username"] = user.Email
+		m["timestamp"] = time.Now()
+		this.SetSession(beeC["sessionname"], m)
+		this.Redirect("/user/genpass2", 307)
+	}
+	flash.Notice("You can now login with your temporary password.")
+	flash.Store(&this.Controller)
+	this.Redirect("/notice", 302)
+}
+
+func (this *MainController) Genpass2() {
+	this.activeContent("user/genpass2")
+
+	flash := beego.NewFlash()
+
+	beeC := conf.BeeConf(
+		"sessionname",
+		"db::beego_db_alias",
+		"vault::beego_vault_address",
+		"vault::beego_vault_token",
+		"vault::beego_vault_transit_key",
+	)
+
+	//////////////////////////////
+	// This page requires login //
+	//////////////////////////////
+	sess := this.GetSession(beeC["sessionname"])
+	if sess == nil {
+		flash.Error("Unable to proceed with updating your temporary password.")
+		flash.Store(&this.Controller)
+		this.Redirect("/user/login/home", 302)
+	}
+
+	m := sess.(map[string]interface{})
+
+	// Step 1:---------- Read current password hash from database-----------------
+	crypt := NewCrypter(beeC)
+	user := this.ReadAuthUser(m["username"].(string), beeC["beego_db_alias"])()
+	crypt.vaultv1 = user.Password
+	if err := crypt.De(); err != nil {
+		log.Printf("ERROR [*] VaultDecrypter.Set().. %v", err)
+	}
+
+	if this.Ctx.Input.Method() == "POST" {
+		current := this.GetString("current")
+		password := this.GetString("password")
+		password2 := this.GetString("password2")
+		valid := validation.Validation{}
+		valid.MinSize(password, 12, "password")
+		valid.Required(password2, "password2")
+		valid.Required(current, "current")
+		if valid.HasErrors() {
+			// return all recorded errors at once
+			errormap := []string{}
+			for _, err := range valid.Errors {
+				errormap = append(errormap, "Validation failed on "+err.Key+": "+err.Message+"\n")
+			}
+			this.Data["Errors"] = errormap
+			errR := this.Render()
+			if errR != nil {
+				fmt.Printf("ERROR [*] MainController.Register() validation.. %v", errR)
+			}
+		}
+		if password != password2 {
+			flash.Error("Passwords don't match.")
+			flash.Store(&this.Controller)
+			errR := this.Render()
+			if errR != nil {
+				fmt.Println(errR)
+			}
+		}
+		if crypt.value != current {
+			flash.Error("The current password is incorrect.")
+			flash.Store(&this.Controller)
+			errR := this.Render()
+			if errR != nil {
+				fmt.Println(errR)
+			}
+		}
+		// Step 3: ---------- Update Password in database----------------------
+		crypt.value = password
+		if err := crypt.En(); err != nil {
+			log.Printf("ERROR [*] MainController.Genpass2(), VaultCrypter.En().. %v", err)
+		}
+		user.Password = crypt.vaultv1
+		o := orm.NewOrm()
+		o.Using(beeC["beego_db_alias"])
+		_, err := o.Update(user)
+		if err != nil {
+			flash.Error("Password reset failed. Please try again..")
+			flash.Store(&this.Controller)
+			errR := this.Render()
+			if errR != nil {
+				fmt.Println(errR)
+			}
+		}
+		flash.Notice("Your temporary password has been updated.")
+		flash.Store(&this.Controller)
+		this.Redirect("/notice", 302)
+	}
+	errR := this.Render()
+	if errR != nil {
+		fmt.Println(errR)
+	}
+}
+
 func (this *MainController) Profile() {
 	// ----------------------------- GET--------------------------------------------
 	this.activeContent("user/profile")
@@ -351,55 +456,19 @@ func (this *MainController) Profile() {
 
 	// Step 1:---------- Read current password hash from database-----------------
 	crypt := NewCrypter(beeC)
-	o := orm.NewOrm()
-	o.Using(beeC["beego_db_alias"])
-	user := &models.AuthUser{Email: m["username"].(string)}
-	err := o.Read(user, "Email")
-	if err != nil {
-		switch errM := err.Error(); {
-		case errM == orm.ErrNoRows.Error():
-			log.Printf("ERROR [*] No result found.. %v", err)
-			flash.Error("No such user/email")
-			flash.Store(&this.Controller)
-			errR := this.Render()
-			if errR != nil {
-				fmt.Println(errR)
-			}
-		case errM == orm.ErrMissPK.Error():
-			log.Printf("ERROR [*] No primary key found.. %v", err)
-			flash.Error("No such user/email")
-			flash.Store(&this.Controller)
-			errR := this.Render()
-			if errR != nil {
-				fmt.Println(errR)
-			}
-		default:
-			log.Printf("ERROR [*] Something else went wrong.. %v", err)
-			flash.Error("No such user/email")
-			flash.Store(&this.Controller)
-			errR := this.Render()
-			if errR != nil {
-				fmt.Println(errR)
-			}
-		}
-	} else {
-		// Verify() will remove uuid from user, hence if it still exists
-		// it indicates that account verification (email) has not been
-		// completed
-		if user.Reg_key != "" {
-			flash.Error("Account not verified")
-			flash.Store(&this.Controller)
-			return
-		}
-		crypt.vaultv1 = user.Password
-		if err := crypt.De(); err != nil {
-			log.Printf("ERROR [*] VaultDecrypter.Set().. %v", err)
-		}
-
-		this.Data["First"] = user.First
-		this.Data["Last"] = user.Last
-		this.Data["Email"] = user.Email
+	user := this.ReadAuthUser(m["username"].(string), beeC["beego_db_alias"])()
+	if user.Reg_key != "" {
+		flash.Error("Account not verified")
+		flash.Store(&this.Controller)
+		return
 	}
+	crypt.vaultv1 = user.Password
+	if err := crypt.De(); err != nil {
+		log.Printf("ERROR [*] VaultDecrypter.Set().. %v", err)
+	}
+	this.Data["First"] = user.First
+	this.Data["Last"] = user.Last
+	this.Data["Email"] = user.Email
 
 	// this deferred function ensures that the correct fields from the database are displayed
 	defer func(this *MainController, user *models.AuthUser) {
@@ -434,7 +503,10 @@ func (this *MainController) Profile() {
 		if email != this.Data["Email"] {
 			flash.Error("Your Email cannot be changed. You must create a new account.")
 			flash.Store(&this.Controller)
-			return
+			errR := this.Render()
+			if errR != nil {
+				fmt.Println(errR)
+			}
 		}
 
 		// Step 2:---------- Compare submitted password with database---------
@@ -443,13 +515,18 @@ func (this *MainController) Profile() {
 		if current != crypt.value {
 			flash.Error("Bad current password")
 			flash.Store(&this.Controller)
-			return
+			errR := this.Render()
+			if errR != nil {
+				fmt.Println(errR)
+			}
 		}
 
 		// Step 3: --------- update user info in db---------------------------
 		user.First = first
 		user.Last = last
 
+		o := orm.NewOrm()
+		o.Using(beeC["beego_db_alias"])
 		_, err := o.Update(user)
 		if err == nil {
 			flash.Notice("Profile updated")
@@ -512,49 +589,19 @@ func (this *MainController) Remove() {
 
 		// Step 1---------- Read password hash from database-------------
 		crypt := NewCrypter(beeC)
-		o := orm.NewOrm()
-		o.Using(beeC["beego_db_alias"])
-		user := &models.AuthUser{Email: m["username"].(string)}
-		switch err := o.Read(user, "Email"); {
-		case err == orm.ErrNoRows:
-			log.Printf("ERROR [*] No result found.. %v", err)
-			flash.Error("No such user/email")
+		user := this.ReadAuthUser(m["username"].(string), beeC["beego_db_alias"])()
+		// Verify() will remove uuid from user, hence if it still exists
+		// it indicates that account verification (email) has not been
+		// completed
+		if user.Reg_key != "" {
+			flash.Error("Account not verified")
 			flash.Store(&this.Controller)
-			errR := this.Render()
-			if errR != nil {
-				fmt.Println(errR)
-			}
-		case err == orm.ErrMissPK:
-			log.Printf("ERROR [*] No primary key found.. %v", err)
-			flash.Error("No such user/email")
-			flash.Store(&this.Controller)
-			errR := this.Render()
-			if errR != nil {
-				fmt.Println(errR)
-			}
-		case err != nil:
-			log.Printf("ERROR [*] Something else went wrong.. %v", err)
-			flash.Error("No such user/email")
-			flash.Store(&this.Controller)
-			errR := this.Render()
-			if errR != nil {
-				fmt.Println(errR)
-			}
-		case err == nil:
-			// Verify() will remove uuid from user, hence if it still exists
-			// it indicates that account verification (email) has not been
-			// completed
-			if user.Reg_key != "" {
-				flash.Error("Account not verified")
-				flash.Store(&this.Controller)
-				return
-			}
-			crypt.vaultv1 = user.Password
-			if err := crypt.De(); err != nil {
-				log.Printf("ERROR [*] VaultDecryptVal.Set().. %v", err)
-			}
+			return
 		}
-
+		crypt.vaultv1 = user.Password
+		if err := crypt.De(); err != nil {
+			log.Printf("ERROR [*] VaultDecryptVal.Set().. %v", err)
+		}
 		// User is required to provide password in order to proceed
 		// Step 2: -------- Compare submitted password with database------
 		if current != crypt.value {
@@ -566,6 +613,8 @@ func (this *MainController) Remove() {
 			}
 		}
 
+		o := orm.NewOrm()
+		o.Using(beeC["beego_db_alias"])
 		a := uuid.NewV4()
 		user.Active = a.String()
 		_, err := o.Update(user)
@@ -600,6 +649,143 @@ func (this *MainController) Remove() {
 	if err != nil {
 		fmt.Println(err)
 	}
+}
+
+func (this *MainController) Reset() {
+	this.activeContent("user/reset")
+
+	beeC := conf.BeeConf(
+		"httpport",
+		"sessionname",
+		"db::beego_db_alias",
+		"vault::beego_vault_address",
+		"vault::beego_vault_token",
+		"vault::beego_vault_transit_key",
+		"sendgrid::beego_sg_own_support",
+		"sendgrid::beego_sg_api_key",
+	)
+
+	// -----------------------------POST -----------------------------------------
+	if this.Ctx.Input.Method() == "POST" {
+		current := this.GetString("current")
+		valid := validation.Validation{}
+		valid.Email(current, "current")
+		valid.Required(current, "current")
+		if valid.HasErrors() {
+			errormap := []string{}
+			for _, err := range valid.Errors {
+				errormap = append(errormap, "Validation failed on "+err.Key+": "+err.Message+"\n")
+			}
+			this.Data["Errors"] = errormap
+			errR := this.Render()
+			if errR != nil {
+				fmt.Printf("ERROR [*] MainController.Reset() validation.. %v", errR)
+			}
+		}
+
+		flash := beego.NewFlash()
+
+		// Step 1---------- Read password hash from database-------------
+		user := this.ReadAuthUser(current, beeC["beego_db_alias"])()
+		// Drop out if last password reset was within 24h
+		// The first time an empty time field is accepted
+		if !user.Rst_date.Equal(time.Time{}) {
+			tn := time.Now().UTC()
+			tr := user.Rst_date
+			if 24*time.Hour > tn.Sub(tr) {
+				flash.Error("There must be at least 24h after your last reset.")
+				flash.Store(&this.Controller)
+				errR := this.Render()
+				if errR != nil {
+					fmt.Println(errR)
+				}
+			}
+		}
+		// Step 2: ------ Generate New Random Password----------------
+		r := uuid.NewV4()
+		newPass := utils.RandomCreateBytes(16)
+		crypt := NewCrypter(beeC)
+		crypt.value = string(newPass)
+		if err := crypt.En(); err != nil {
+			log.Printf("ERROR [*] MainController.Register(), VaultCrypter.En().. %v", err)
+		}
+		user.Reset = r.String()
+		user.Password = crypt.vaultv1
+		o := orm.NewOrm()
+		o.Using(beeC["beego_db_alias"])
+		_, err := o.Update(user)
+		if err != nil {
+			flash.Error("Deactivation failed. Please try again..")
+			flash.Store(&this.Controller)
+			errR := this.Render()
+			if errR != nil {
+				fmt.Println(errR)
+			}
+		}
+
+		// Step 3: ------ Send Reset Email-----------------------------
+		if !sendReset(user, r.String(), newPass, beeC) {
+			flash.Error("Unable to send password reset email")
+			flash.Store(&this.Controller)
+			errR := this.Render()
+			if errR != nil {
+				fmt.Println(errR)
+			}
+		}
+
+		// Step 4: ------ Append confirmation to flash & redirect------
+		flash.Notice("Your password has been reset. Please follow the instructions in your confirmation email.")
+		flash.Store(&this.Controller)
+		this.Redirect("/notice", 302)
+	}
+
+	// explicit render (can be omitted by setting: 'autorender = true')
+	errR := this.Render()
+	if errR != nil {
+		fmt.Println(errR)
+	}
+}
+
+// ReadOrm02User ensures that subsequent actions do have an existing user struct pointer
+// and if not so differentiates the Read errors
+func (c *MainController) ReadAuthUser(se, al string) func() *models.AuthUser {
+	flash := beego.NewFlash()
+	o := orm.NewOrm()
+	o.Using(al)
+	user := &models.AuthUser{Email: se}
+	fc := func() *models.AuthUser {
+		err := o.Read(user, "Email")
+		if err != nil {
+			switch errM := err.Error(); {
+			case errM == orm.ErrNoRows.Error():
+				log.Printf("ERROR [*] No result found.. %v", err)
+				flash.Error("No such user/email")
+				flash.Store(&c.Controller)
+				errR := c.Render()
+				if errR != nil {
+					fmt.Println(errR)
+				}
+			case errM == orm.ErrMissPK.Error():
+				log.Printf("ERROR [*] No primary key found.. %v", err)
+				flash.Error("No such user/email")
+				flash.Store(&c.Controller)
+				errR := c.Render()
+				if errR != nil {
+					fmt.Println(errR)
+				}
+			default:
+				log.Printf("ERROR [*] Something else went wrong.. %v", err)
+				flash.Error("No such user/email")
+				flash.Store(&c.Controller)
+				errR := c.Render()
+				if errR != nil {
+					fmt.Println(errR)
+				}
+			}
+		}
+		return user
+	}
+	return fc
 }
 
 // verification email after user registered
@@ -696,4 +882,60 @@ func sendCancellation(authusr *models.AuthUser, uid string, conf map[string]stri
 		log.Printf("INFO [*] Sendgrid response, header: %#v", response.Headers)
 	}
 	return true
+}
+
+// verification email after user initiated to reset password
+func sendReset(authusr *models.AuthUser, uid string, pass []byte, conf map[string]string) bool {
+	// Step 1: -------------------- Prepare html---------------------------------
+	link := "http://localhost:" + conf["httpport"] + "/user/genpass1/" + uid
+	pwd, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
+	t, err := template.New("reset.tpl").ParseFiles(pwd + "/controllers/reset.tpl")
+	if err != nil {
+		log.Printf("ERROR [*] Parse html failed.. %v", err)
+	}
+
+	data := struct {
+		User string
+		Link string
+		RanB string
+	}{
+		User: string(authusr.First),
+		Link: link,
+		RanB: string(pass),
+	}
+
+	var tplOut bytes.Buffer
+	if err := t.Execute(&tplOut, data); err != nil {
+		log.Printf("ERROR [*] sendReset: tpl.exec failed.. %v", err)
+		return false
+	}
+	content := tplOut.String()
+
+	// Step 2: -------------------- Send Email-----------------------------------
+	from := mail.NewEmail("Your Support Team", conf["beego_sg_own_support"])
+	subject := "Sending with SendGrid: password reset"
+	to := mail.NewEmail("Peter Pan", authusr.Email)
+	htmlContent := content
+	message := mail.NewSingleEmail(from, subject, to, "", htmlContent)
+
+	// -> /v3/mail/send
+	sg_client := sendgrid.NewSendClient(conf["beego_sg_api_key"])
+	response, err := sg_client.Send(message)
+	if err != nil {
+		log.Printf("ERROR [*] Sending email failed.. %v", err)
+		return false
+	} else {
+		log.Printf("INFO [*] Sendgrid response, status: %v", response.StatusCode)
+		log.Printf("INFO [*] Sendgrid response, body: %v", response.Body)
+		log.Printf("INFO [*] Sendgrid response, header: %#v", response.Headers)
+	}
+	return true
+}
+
+func doStuffWithAuthUser(u *models.AuthUser) error {
+	log.Printf("INFO [*] do something with user: %#v", u)
+	return nil
 }

@@ -14,7 +14,10 @@ func init() {
 	beego.Router("/user/profile", &controllers.MainController{}, "get,post:Profile")
 	beego.Router("/user/verify/:uuid([0-9A-Fa-f]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89ABab][0-9a-fA-F]{3}-[a-fA-F0-9]{12}$)", &controllers.MainController{}, "get:Verify")
 	beego.Router("/user/cancel/:uuid([0-9A-Fa-f]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89ABab][0-9a-fA-F]{3}-[a-fA-F0-9]{12}$)", &controllers.MainController{}, "get:Cancel")
+	beego.Router("/user/genpass1/:uuid([0-9A-Fa-f]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89ABab][0-9a-fA-F]{3}-[a-fA-F0-9]{12}$)", &controllers.MainController{}, "get:Genpass1")
+	beego.Router("/user/genpass2", &controllers.MainController{}, "get,post:Genpass2")
 	beego.Router("/user/remove", &controllers.MainController{}, "get,post:Remove")
+	beego.Router("/user/reset", &controllers.MainController{}, "get,post:Reset")
 	beego.Router("/notice", &controllers.MainController{}, "get:Notice")
 
 }

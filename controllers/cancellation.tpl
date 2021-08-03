@@ -118,7 +118,9 @@ op" align="left"><a href="http://links.twilio.com/Mjk0LVRLQi0zMDAAAAF-jUOv1pbDzA
 <table style="box-sizing: border-box; width: 100%; border-spacing: 0; mso-table-rspace: 0pt; mso-table-lspace: 0pt; border-collapse: separate !important;" width="100%">
 <tbody>
 <tr>
-<td style="box-sizing: border-box; padding: 0; font-family: 'Open Sans', 'Helvetica Neue', 'Helvetica', Helvetica, Arial, sans-serif; font-size: 16px; vertical-align: top;" valign="top"> <p style="margin: 20px 10px 0px; color: #294661; font-family: &quot;Open Sans&quot;,&quot;Helvetica Neue&quot;,&quot;Helvetica&quot;,Helvetica,Arial,sans-serif; font-size: 16px; font-weight: 300; text-align: left;">Hi {{.User}}, <br><br>Please confirm the cancellation of your account. Within the next 7 days you will be able to reactivate your account.After that your account is removed, and it will not be possible to create a new account with the same email address.<br><br> <i>Click on the checkboxes below to learn more about each task.</i></p> </td>
+<td style="box-sizing: border-box; padding: 0; font-family: 'Open Sans', 'Helvetica Neue', 'Helvetica', Helvetica, Arial, sans-serif; font-size: 16px; vertical-align: top;" valign="top"> 
+<p style="margin: 20px 10px 0px; color: #294661; font-family: &quot;Open Sans&quot;,&quot;Helvetica Neue&quot;,&quot;Helvetica&quot;,Helvetica,Arial,sans-serif; font-size: 16px; font-weight: 300; text-align: left;">Hi {{.User}}, <br><br>Please confirm the cancellation of your account. Within the next 7 days you will be able to reactivate your account.After that your account is removed, and it will not be possible to create a new account with the same email address.<br><br> <i>Click on the checkboxes below to learn more about each task.</i></p> 
+</td>
 </tr>
 </tbody>
 </table> </td>
@@ -127,8 +129,7 @@ op" align="left"><a href="http://links.twilio.com/Mjk0LVRLQi0zMDAAAAF-jUOv1pbDzA
 </table>
 </div>
 <div class="block" style="box-sizing:border-box; width:100%; margin-bottom:5px; background:#ffffff; border:0px solid #f0f0f0; ">
-<table style="box-sizing:border-box; width:100%; border-spacing:0; mso-ta
-ble-rspace:0pt; mso-table-lspace:0pt; border-collapse:separate !important; 
+<table style="box-sizing:border-box; width:100%; border-spacing:0; mso-table-rspace:0pt; mso-table-lspace:0pt; border-collapse:separate !important; 
 " width="100%">
 <tbody style="">
 <tr style="">

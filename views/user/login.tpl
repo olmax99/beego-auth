@@ -23,7 +23,10 @@
 </tr>
 <tr><td>&nbsp;</td></tr>
 <tr>
-    <td>&nbsp;</td><td><input type="submit" value="Login" /></td><td><a href="http://localhost:{{.Httpport}}/user/register">Register</a></td>
+    <td>&nbsp;</td>
+    <td><input type="submit" value="Login" /></td>
+    <td><a href="http://localhost:{{.Httpport}}/user/register">Register</a></td>
+    <td><a href="http://localhost:{{.Httpport}}/user/reset">Reset Password</a></td>
 </tr>
 </table>
 </form>

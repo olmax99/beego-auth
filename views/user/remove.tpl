@@ -13,15 +13,19 @@
 {{end}}
 <p><font size="3">Provide your password for proceeding with the cancellation of your account.</font></p>
 <form method="POST">
-<table>
-<tr>      
-    <td>Current password:</td>
-    <td><input name="current" type="password" /></td>
-</tr>
-<tr><td>&nbsp;</td></tr>
-<tr>
-    <td>&nbsp;</td><td><input type="submit" value="Remove" /></td><td><a href="http://localhost:{{.Httpport}}/home">Cancel</a></td>
-</tr>
-</table>
+    <table>
+        <tr>
+            <td>Current password:</td>
+            <td><input name="current" type="password" /></td>
+        </tr>
+        <tr>
+            <td>&nbsp;</td>
+        </tr>
+        <tr>
+            <td>&nbsp;</td>
+            <td><input type="submit" value="Remove" /></td>
+            <td><a href="http://localhost:{{.Httpport}}/home">Cancel</a></td>
+        </tr>
+    </table>
 </form>
 </div>

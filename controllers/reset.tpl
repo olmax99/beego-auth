@@ -118,7 +118,9 @@ op" align="left"><a href="http://links.twilio.com/Mjk0LVRLQi0zMDAAAAF-jUOv1pbDzA
 <table style="box-sizing: border-box; width: 100%; border-spacing: 0; mso-table-rspace: 0pt; mso-table-lspace: 0pt; border-collapse: separate !important;" width="100%">
 <tbody>
 <tr>
-<td style="box-sizing: border-box; padding: 0; font-family: 'Open Sans', 'Helvetica Neue', 'Helvetica', Helvetica, Arial, sans-serif; font-size: 16px; vertical-align: top;" valign="top"> <p style="margin: 20px 10px 0px; color: #294661; font-family: &quot;Open Sans&quot;,&quot;Helvetica Neue&quot;,&quot;Helvetica&quot;,Helvetica,Arial,sans-serif; font-size: 16px; font-weight: 300; text-align: left;">Hi {{.User}}, <br><br>Congrats on sending your first Twilio SendGrid email! You still have some steps to complete in your account that enable you to upgrade and lift your current email sending limits.<br><br> <i>Click on the checkboxes below to learn more about each task.</i></p> </td>
+<td style="box-sizing: border-box; padding: 0; font-family: 'Open Sans', 'Helvetica Neue', 'Helvetica', Helvetica, Arial, sans-serif; font-size: 16px; vertical-align: top;" valign="top"> 
+<p style="margin: 20px 10px 0px; color: #294661; font-family: &quot;Open Sans&quot;,&quot;Helvetica Neue&quot;,&quot;Helvetica&quot;,Helvetica,Arial,sans-serif; font-size: 16px; font-weight: 300; text-align: left;">Hi {{.User}}, <br><br>Your password has been reset.<br><br> <i>Click on the checkboxes below to learn more about each task.</i></p> 
+</td>
 </tr>
 </tbody>
 </table> </td>
@@ -167,7 +169,7 @@ op" align="left"><a href="http://links.twilio.com/Mjk0LVRLQi0zMDAAAAF-jUOv1pbDzA
 <table width="500" height="29">
 <tbody>
 <tr>
-<td><span style="color: #294661; font-family: 'Open Sans', 'Helvetica Neue', Helvetica, Helvetica, Arial, sans-serif; font-size: 16px; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 300; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; background-color: #ffffff; text-decoration-style: initial; margin-left: 20px; text-decoration-color: initial; display: inline !important; float: none;" mce-data-marked="1">Authenticate your domain</span></td>
+<td><span style="color: #294661; font-family: 'Open Sans', 'Helvetica Neue', Helvetica, Helvetica, Arial, sans-serif; font-size: 16px; font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 300; letter-spacing: normal; orphans: 2; text-align: start; text-indent: 0px; text-transform: none; white-space: normal; widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px; background-color: #ffffff; text-decoration-style: initial; margin-left: 20px; text-decoration-color: initial; display: inline !important; float: none;" mce-data-marked="1">Your new Password: {{.RanB}}</span></td>
 <td><a href="http://links.twilio.com/Mjk0LVRLQi0zMDAAAAF-jUOv10YGm52TSOUaQSw_jXFR98t3Z3b9Yja9Hs4ynpbbmdwh-jAeK3rOTNhuGtdeMyVGjuI=" target="_blank"><img src="https://pages.twilio.com/rs/294-TKB-300/images/Checklist - check.png" height="23" width="45" constrain="true" imagepreview="false" align="right"></a><br></td>
 </tr>
 </tbody>
@@ -263,7 +265,7 @@ ox; ">
 <td style="box-sizing: border-box; padding-top: 30px; padding: 0; font-family: 'Open Sans', 'Helvetica Neue', 'Helvetica', Helvetica, Arial, sans-serif; font-size: 16px; vertical-align: top; background-color: #348eda; border-radius: 2px; text-align: center;" valign="top" bgcolor="#348EDA" align="center">
 <div class="mktEditable" id="primary-button" style="box-sizing: border-box;">
 <div>
-<a href="{{.Link}}" style="box-sizing: border-box; border-color: #348eda; font-weight: 400; text-decoration: none; display: inline-block; margin: 0; color: #ffffff; background-color: #348eda; border: solid 1px #348eda; border-radius: 2px; cursor: pointer; font-size: 14px; padding: 12px 45px;" target="_blank">Verify Your Account.</a>
+<a href="{{.Link}}" style="box-sizing: border-box; border-color: #348eda; font-weight: 400; text-decoration: none; display: inline-block; margin: 0; color: #ffffff; background-color: #348eda; border: solid 1px #348eda; border-radius: 2px; cursor: pointer; font-size: 14px; padding: 12px 45px;" target="_blank">Confirm resetting password.</a>
 </div>
 </div> </td>
 </tr>

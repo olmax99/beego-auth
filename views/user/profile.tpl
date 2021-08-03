@@ -25,23 +25,12 @@
     <td><input name="last" type="text" value="{{.Last}}"/></td>
 </tr>
 <tr>
-    <td>Email address:</td>
+    <td>Email address: (Cannot be changed)</td>
     <td><input name="email" type="text" value="{{.Email}}"/></td>
 </tr>
 <tr>
     <td>Current password:</td>
     <td><input name="current" type="password" /></td>
-</tr>
-<tr>
-<td>Optional:</td>
-</tr>
-<tr>
-    <td>New password (must be at least 6 characters):</td>
-    <td><input name="password" type="password" /></td>
-</tr>
-<tr>
-    <td>Confirm new password:</td>
-    <td><input name="password2" type="password" /></td>
 </tr>
 <tr><td>&nbsp;</td></tr>
 <tr>
