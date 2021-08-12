@@ -16,6 +16,31 @@ type VaultCrypter struct {
 	lock    sync.RWMutex
 }
 
+// GetClient shows Vault mount point
+func (vc *VaultCrypter) GetClient() string {
+	return vc.client.MountPoint
+}
+
+// GetValue returns private plaintext value
+func (vc *VaultCrypter) GetValue() string {
+	return vc.value
+}
+
+// GetVaultv1 returns private var vaultv1
+func (vc *VaultCrypter) GetVaultv1() string {
+	return vc.vaultv1
+}
+
+// Vaultv1 Set private var vaultv1
+func (vc *VaultCrypter) SetVaultv1(v string) {
+	vc.vaultv1 = v
+}
+
+// Value Set private var value
+func (vc *VaultCrypter) SetValue(v string) {
+	vc.value = v
+}
+
 // Create the decrypted user password value from the vault:v1 string
 func (vc *VaultCrypter) De() error {
 	vc.lock.Lock()
@@ -46,7 +71,19 @@ func (vc *VaultCrypter) En() error {
 	return nil
 }
 
-// Create a new Vault Transit container
+func (vc *VaultCrypter) Match(p string) bool {
+	return vc.value == p
+}
+
+func (vc *VaultCrypter) FromBytes(b []byte) string {
+	vc.value = string(b)
+	if err := vc.En(); err != nil {
+		log.Printf("ERROR [*] From bytes failed.. %v", err)
+	}
+	return vc.vaultv1
+}
+
+// Create a new Vault Transit container using Beego Configuration parameters
 func NewCrypter(beeCfg map[string]string) *VaultCrypter {
 	c := &VaultCrypter{}
 	c.lock.Lock()
@@ -54,7 +91,7 @@ func NewCrypter(beeCfg map[string]string) *VaultCrypter {
 	c.config = beeCfg
 	client, err := vault.NewClient(c.config["beego_vault_address"], vault.WithCaPath(""))
 	if err != nil {
-		log.Println("PANIC [-] Could not connect with Vault")
+		log.Println("WARNING [-] Could not connect with Vault")
 		return nil
 	}
 	if t := client.Token(); t == "" {

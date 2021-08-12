@@ -5,7 +5,6 @@
 # *.[oa]
 # *~
 /lastupdate.tmp
-/conf
 /static
 /media
 /.beego.env

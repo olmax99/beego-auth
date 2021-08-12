@@ -1,12 +1,15 @@
 #+TITLE: beego-auth
 #+SETUPFILE: ~/s3sync/org/conf/setup.config
-#+FILETAGS: :biscari:golang:go-channels:authentication:beego:web
+#+FILETAGS: :golang:authentication:beego:web
 
-First beego trial iteration:
-1. http controller
-2. rest controller
-3. models
-4. sqlite
+The main goal of this project is to develop a small /stand-alone/ user login for
+the [[https://beego.me/][Beego Framework]] by [[https://github.com/astaxie][astaxie]]. This work is mainly a
+continuation of the [[https://github.com/horrido/acme][beego-acme]] example presented in the article "[[https://richardeng.medium.com/a-word-from-the-beegoist-d562ff8589d7][A Word From The
+Beegoist]]" (2014, [[https://github.com/horrido][Richard Eng]]).
+
+* Further Topics
+- Beego integration of Vault utilizing [[https://github.com/mittwald/vaultgo][vaultgo]] package by [[https://github.com/mittwald][Mittwald CM Service]].
+
 
 * Prerequisites
 - Beego v2.0.2
@@ -14,15 +17,6 @@ First beego trial iteration:
 
 * Getting Started
 ** Run Main
-- Create =.beego.env= 
-#+begin_src bash
-export VAULT_ADDR='http://127.0.0.1:8200'
-export BEEGO_DB_ALIAS="auth"
-export BEEGO_VAULT_TOKEN=`cat vault_root_dev.key`
-export BEEGO_SENDGRID_OWN_SUPPORT=support@<sendgrid-verified>.domain
-export BEEGO_SENDGRID_API_KEY=`cat sendgrid_api_key`
-#+end_src
-
 - Run =beego-auth=
 #+begin_src bash
 $ source .beego.env
@@ -37,10 +31,33 @@ $ ./beego-auth
 #+end_src
 
 * Testing
-..
+#+begin_src bash
+go test ./conf -v
+go test ./controllers -v
+#+end_src
 
 * General Instructions
-..
+** Beego Config
+- loaded by default [[file:vendor/github.com/beego/beego/v2/core/config/ini.go::func init() {][beego/beego/v2/core/config/ini.go]]
+- may lead to /[W]/ (Beego Warning):
+#+begin_src bash
+2021/12/01 12:09:06.965 [W]  init global config instance failed. If you donot
+use this, just ignore it.  open conf/app.conf: no such file or directory
+#+end_src
+
+- work-around by providing empty =app.conf= with /include./
+
+** Create Vault Transit Key
+#+begin_src bash
+$ vault secrets enable transit
+$ vault write -f transit/keys/beego-key
+$ vault list transit/keys
+$ vault read transit/keys/beego-key
+#+end_src
 
 * Where to go from here?
 ..
+
+* Credits
+- Thanks to [[https://github.com/horrido][Richard Eng]].
+- Thanks to [[https://github.com/mittwald][Mittwald CM Service]].

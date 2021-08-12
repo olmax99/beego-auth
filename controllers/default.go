@@ -13,7 +13,7 @@ type MainController struct {
 }
 
 /////////////////////////////////////////////////////
-// NOTE: Deactivate autorender for replacing with  //
+// TODO: Deactivate autorender for replacing with  //
 // 						   //
 // https://github.com/oal/beego-pongo2		   //
 /////////////////////////////////////////////////////
@@ -21,6 +21,7 @@ type MainController struct {
 // active Content is building the html output from the appropriate templates
 func (this *MainController) activeContent(view string) {
 	beeC := conf.BeeConf(
+		"",
 		"httpport",
 		"sessionname",
 	)
@@ -40,7 +41,7 @@ func (this *MainController) activeContent(view string) {
 	if sess != nil {
 		this.Data["InSession"] = 1 // for login bar in header.tpl
 		m := sess.(map[string]interface{})
-		// m["first"] refers to the sessios user's first name
+		// m["first"] refers to the sessions user's first name
 		this.Data["First"] = m["first"]
 	}
 }
@@ -51,14 +52,8 @@ func (this *MainController) Get() {
 	beeC := conf.BeeConf(
 		"sessionname",
 	)
-	//////////////////////////////
-	// This page requires login //
-	//////////////////////////////
+
 	sess := this.GetSession(beeC["sessionname"])
-	if sess == nil {
-		this.Redirect("/user/login/home", 302)
-		return
-	}
 	m := sess.(map[string]interface{})
 	fmt.Println("INFO [+] Initialize new session")
 	fmt.Println("INFO [*] username is", m["username"])

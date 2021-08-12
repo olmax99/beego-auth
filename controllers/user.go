@@ -12,9 +12,10 @@ import (
 	"beego-auth/conf"
 	"beego-auth/models"
 
-	"github.com/astaxie/beego/validation"
 	"github.com/beego/beego/v2/adapter/orm"
 	"github.com/beego/beego/v2/adapter/utils"
+	"github.com/beego/beego/v2/core/validation"
+	"github.com/beego/beego/v2/server/web/context"
 	"github.com/twinj/uuid"
 
 	beego "github.com/beego/beego/v2/server/web"
@@ -36,7 +37,7 @@ func (this *MainController) Login() {
 
 		flash := beego.NewFlash()
 
-		beeC := conf.BeeConf(
+		beeC := conf.BeeConf("",
 			"sessionname",
 			"db::beego_db_alias",
 			"vault::beego_vault_transit_key",
@@ -61,6 +62,7 @@ func (this *MainController) Login() {
 			if errR != nil {
 				fmt.Println(errR)
 			}
+			return
 		}
 
 		// Step 2: ----------- Read User Password from DB and Decrypt----------
@@ -78,6 +80,7 @@ func (this *MainController) Login() {
 				fmt.Println(errR)
 			}
 		}
+		// TODO move to crypt.go
 		// Step 5: ----------- Compare password with db--------
 		crypt.vaultv1 = user.Password
 		if err := crypt.De(); err != nil {
@@ -108,7 +111,7 @@ func (this *MainController) Login() {
 func (this *MainController) Logout() {
 	flash := beego.NewFlash()
 
-	beeC := conf.BeeConf(
+	beeC := conf.BeeConf("",
 		"sessionname",
 	)
 
@@ -128,7 +131,7 @@ func (this *MainController) Register() {
 	if this.Ctx.Input.Method() == "POST" {
 		flash := beego.NewFlash()
 
-		beeC := conf.BeeConf(
+		beeC := conf.BeeConf("",
 			"httpport",
 			"db::beego_db_alias",
 			"vault::beego_vault_address",
@@ -145,7 +148,7 @@ func (this *MainController) Register() {
 		password2 := this.GetString("password2")
 
 		// Step 1: -------------- Validate Form input---------------------------
-		// TODO implement https://gowalker.org/github.com/astaxie/beego/validation#ValidFormer:
+		// TODO: implement https://gowalker.org/github.com/beego/beego/v2/core/validation#ValidFormer:
 		// - Adjust user struct with valid tags
 		valid := validation.Validation{}
 		valid.Required(first, "first")
@@ -190,7 +193,7 @@ func (this *MainController) Register() {
 		_, err := o.Insert(user)
 		if err != nil {
 			log.Printf("ERROR [*] Register() Insert.. %v", err)
-			// TODO confirm if other errors need to be handled??
+			// TODO: confirm if other errors need to be handled??
 			flash.Error(email + " already registered")
 			flash.Store(&this.Controller)
 			errR := this.Render()
@@ -201,7 +204,7 @@ func (this *MainController) Register() {
 		}
 
 		// Step 6: --------------- Send verification email----------------------
-		// TODO Verify successfully send (webhook??)
+		// TODO: Verify successfully send (webhook??)
 		if !sendVerification(user, u.String(), beeC) {
 			flash.Error("Unable to send verification email")
 			flash.Store(&this.Controller)
@@ -225,7 +228,7 @@ func (this *MainController) Verify() {
 	// ----------------------------- GET--------------------------------------------
 	this.activeContent("user/verify")
 
-	beeC := conf.BeeConf(
+	beeC := conf.BeeConf("",
 		"db::beego_db_alias",
 	)
 
@@ -258,7 +261,7 @@ func (this *MainController) Cancel() {
 
 	flash := beego.NewFlash()
 
-	beeC := conf.BeeConf(
+	beeC := conf.BeeConf("",
 		"db::beego_db_alias",
 	)
 
@@ -297,12 +300,11 @@ func (this *MainController) Cancel() {
 
 func (this *MainController) Genpass1() {
 	// ----------------------------- GET--------------------------------------------
-	// TODO Improve by both reading uuid and allow user to post his current password
+	// TODO: Improve by both reading uuid and allow user to post his current password
 	// At this point it was not clear on how to combine those two
-
 	flash := beego.NewFlash()
 
-	beeC := conf.BeeConf(
+	beeC := conf.BeeConf("",
 		"sessionname",
 		"db::beego_db_alias",
 	)
@@ -339,7 +341,7 @@ func (this *MainController) Genpass2() {
 
 	flash := beego.NewFlash()
 
-	beeC := conf.BeeConf(
+	beeC := conf.BeeConf("",
 		"sessionname",
 		"db::beego_db_alias",
 		"vault::beego_vault_address",
@@ -347,16 +349,7 @@ func (this *MainController) Genpass2() {
 		"vault::beego_vault_transit_key",
 	)
 
-	//////////////////////////////
-	// This page requires login //
-	//////////////////////////////
 	sess := this.GetSession(beeC["sessionname"])
-	if sess == nil {
-		flash.Error("Unable to proceed with updating your temporary password.")
-		flash.Store(&this.Controller)
-		this.Redirect("/user/login/home", 302)
-	}
-
 	m := sess.(map[string]interface{})
 
 	// Step 1:---------- Read current password hash from database-----------------
@@ -436,7 +429,7 @@ func (this *MainController) Profile() {
 
 	flash := beego.NewFlash()
 
-	beeC := conf.BeeConf(
+	beeC := conf.BeeConf("",
 		"sessionname",
 		"db::beego_db_alias",
 		"vault::beego_vault_address",
@@ -444,14 +437,7 @@ func (this *MainController) Profile() {
 		"vault::beego_vault_transit_key",
 	)
 
-	//////////////////////////////
-	// This page requires login //
-	//////////////////////////////
 	sess := this.GetSession(beeC["sessionname"])
-	if sess == nil {
-		this.Redirect("/user/login/home", 302)
-		return
-	}
 	m := sess.(map[string]interface{})
 
 	// Step 1:---------- Read current password hash from database-----------------
@@ -550,7 +536,7 @@ func (this *MainController) Remove() {
 	// ----------------------------- GET------------------------------------------
 	this.activeContent("user/remove")
 
-	beeC := conf.BeeConf(
+	beeC := conf.BeeConf("",
 		"httpport",
 		"sessionname",
 		"db::beego_db_alias",
@@ -561,14 +547,7 @@ func (this *MainController) Remove() {
 		"sendgrid::beego_sg_api_key",
 	)
 
-	//////////////////////////////
-	// This page requires login //
-	//////////////////////////////
 	sess := this.GetSession(beeC["sessionname"])
-	if sess == nil {
-		this.Redirect("/user/login/home", 302)
-		return
-	}
 	m := sess.(map[string]interface{})
 
 	// -----------------------------POST -----------------------------------------
@@ -654,7 +633,7 @@ func (this *MainController) Remove() {
 func (this *MainController) Reset() {
 	this.activeContent("user/reset")
 
-	beeC := conf.BeeConf(
+	beeC := conf.BeeConf("",
 		"httpport",
 		"sessionname",
 		"db::beego_db_alias",
@@ -746,8 +725,9 @@ func (this *MainController) Reset() {
 	}
 }
 
-// ReadOrm02User ensures that subsequent actions do have an existing user struct pointer
-// and if not so differentiates the Read errors
+// TODO move to model - needs separation from controller
+// ReadAuthUser ensures that subsequent actions do have an existing user struct pointer
+// and if not differentiates the Read errors
 func (c *MainController) ReadAuthUser(se, al string) func() *models.AuthUser {
 	flash := beego.NewFlash()
 	o := orm.NewOrm()
@@ -788,6 +768,7 @@ func (c *MainController) ReadAuthUser(se, al string) func() *models.AuthUser {
 	return fc
 }
 
+// TODO move to sendgrid package
 // verification email after user registered
 func sendVerification(authusr *models.AuthUser, uid string, conf map[string]string) bool {
 	// Step 1: -------------------- Prepare html---------------------------------
@@ -823,6 +804,9 @@ func sendVerification(authusr *models.AuthUser, uid string, conf map[string]stri
 	message := mail.NewSingleEmail(from, subject, to, "", htmlContent)
 
 	// -> /v3/mail/send
+	// TODO: This does not catch response errors, i.e. Request successful, but
+	// error within sendgrid ('the from address does not match a verified Sender
+	// Identity')
 	sg_client := sendgrid.NewSendClient(conf["beego_sg_api_key"])
 	response, err := sg_client.Send(message)
 	if err != nil {
@@ -935,7 +919,25 @@ func sendReset(authusr *models.AuthUser, uid string, pass []byte, conf map[strin
 	return true
 }
 
+// TODO mode to model, create non-Beego related user tasks (combine with ReadAuthUser)
 func doStuffWithAuthUser(u *models.AuthUser) error {
 	log.Printf("INFO [*] do something with user: %#v", u)
 	return nil
+}
+
+// customize filters for fine grain authorization
+var FilterUser = func(ctx *context.Context) {
+	beeC := conf.BeeConf("",
+		"sessionName",
+	)
+	// TODO: evaluate if this is method is restrictive enough..
+	// Do not authorize when:
+	// 1. a session does not exists
+	// 2. the request does not come from Request.RequestURI "/login"
+	// 3. the request does not come from Request.RequestURI "/register"
+	_, ok := ctx.Input.Session(beeC["sessionName"]).(int)
+	if !ok && ctx.Input.URI() != "/user/login" && ctx.Input.URI() != "/user/register" {
+		fmt.Printf("DEBUG [*] FilterUser ctx.Input.CruSession: %#v", ctx.Input.CruSession)
+		ctx.Redirect(302, "/user/login/home")
+	}
 }
