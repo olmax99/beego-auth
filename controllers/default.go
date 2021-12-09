@@ -8,7 +8,7 @@ import (
 )
 
 // struct embedding <-- Go mimicing inheritance
-type MainController struct {
+type DefaultController struct {
 	beego.Controller
 }
 
@@ -19,64 +19,66 @@ type MainController struct {
 /////////////////////////////////////////////////////
 
 // active Content is building the html output from the appropriate templates
-func (this *MainController) activeContent(view string) {
-	beeC := conf.BeeConf(
-		"",
+func (ctl *DefaultController) activeContent(view string) {
+	beeC := conf.BeeConf("",
 		"httpport",
 		"sessionname",
 	)
-	this.Data["Httpport"] = beeC["httpport"]
+	ctl.Data["Httpport"] = beeC["httpport"]
 
-	this.Layout = "basic-layout.tpl"
-	this.LayoutSections = make(map[string]string)
-	this.LayoutSections["Header"] = "header.tpl"
-	this.LayoutSections["Footer"] = "footer.tpl"
-	this.TplName = view + ".tpl"
+	ctl.Layout = "basic-layout.tpl"
+	ctl.LayoutSections = make(map[string]string)
+	ctl.LayoutSections["Header"] = "header.tpl"
+	ctl.LayoutSections["Footer"] = "footer.tpl"
+	ctl.TplName = view + ".tpl"
 
-	// All sessions are created in c.user.Login(): this.SetSession("<name>")
-	sess := this.GetSession(beeC["sessionname"])
-	// if the user is logged in (--> there is a non-nil session),
-	// then we set the InSession parameter to a value (any value),
-	// which tells the templating engine to use the “Welcome” bar instead of “Login”.
-	if sess != nil {
-		this.Data["InSession"] = 1 // for login bar in header.tpl
-		m := sess.(map[string]interface{})
-		// m["first"] refers to the sessions user's first name
-		this.Data["First"] = m["first"]
+	// All sessions are created in c.user.Login(): ctl.SetSession("<name>")
+	if view != "/user/login/console" {
+		sess := ctl.GetSession(beeC["sessionname"])
+		// if the user is logged in (--> there is a non-nil session),
+		// then we set the InSession parameter to a value (any value),
+		// which tells the templating engine to use the “Welcome” bar instead of “Login”.
+		if sess != nil {
+			ctl.Data["InSession"] = 1 // for login bar in header.tpl
+			m := sess.(map[string]interface{})
+			// m["first"] refers to the sessions user's first name
+			ctl.Data["First"] = m["first"]
+		}
 	}
 }
 
-func (this *MainController) Get() {
-	this.activeContent("index")
+func (ctl *DefaultController) Get() {
+	ctl.activeContent("index")
 
-	beeC := conf.BeeConf(
+	beeC := conf.BeeConf("",
 		"sessionname",
 	)
 
-	sess := this.GetSession(beeC["sessionname"])
+	sess := ctl.GetSession(beeC["sessionname"])
 	m := sess.(map[string]interface{})
 	fmt.Println("INFO [+] Initialize new session")
 	fmt.Println("INFO [*] username is", m["username"])
 	fmt.Println("INFO [*] logged in at", m["timestamp"])
 
-	err := this.Render()
+	err := ctl.Render()
 	if err != nil {
 		fmt.Println(err)
 	}
 }
 
+// TODO: Probably an Api endpoint or callback handler for JS
 // Sends the Flash Data 'Notice' content to the main view
-func (this *MainController) Notice() {
-	this.activeContent("notice")
+func (ctl *DefaultController) Notice() {
+	ctl.activeContent("notice")
 
 	// returns current flashData map[string]string and
 	// moves the 'flash notice' message into controller's Data output
-	flash := beego.ReadFromRequest(&this.Controller)
+	flash := beego.ReadFromRequest(&ctl.Controller)
 	if n, ok := flash.Data["notice"]; ok {
-		this.Data["notice"] = n
+		ctl.Data["notice"] = n
 	}
 
-	err := this.Render()
+	err := ctl.Render()
 	if err != nil {
 		fmt.Println(err)
 	}

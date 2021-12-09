@@ -5,13 +5,13 @@ go 1.16
 require github.com/beego/beego/v2 v2.0.1
 
 require (
-	github.com/beego/bee/v2 v2.0.2 // indirect
 	github.com/google/go-cmp v0.5.6 // indirect
+	github.com/lib/pq v1.7.0 // indirect
+	github.com/magefile/mage v1.12.0
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible
 	github.com/mittwald/vaultgo v0.0.11 // indirect
 	github.com/myesui/uuid v1.0.0 // indirect
 	github.com/olmax99/vaultgo v0.0.12
-	github.com/rogpeppe/godef v1.1.2 // indirect
 	github.com/sendgrid/rest v2.6.4+incompatible // indirect
 	github.com/sendgrid/sendgrid-go v3.10.0+incompatible
 	github.com/twinj/uuid v1.0.0

@@ -9,7 +9,7 @@ Beegoist]]" (2014, [[https://github.com/horrido][Richard Eng]]).
 
 * Further Topics
 - Beego integration of Vault utilizing [[https://github.com/mittwald/vaultgo][vaultgo]] package by [[https://github.com/mittwald][Mittwald CM Service]].
-
+- Mail client provided by official [[https://github.com/sendgrid/sendgrid-go][Twilio/Sendgrid]] service.
 
 * Prerequisites
 - Beego v2.0.2
@@ -26,6 +26,7 @@ $ ./beego-auth
 
 * Commands
 #+begin_src bash
+# rebuild database (all prior data lost!)
 ./beego-auth orm syncdb -h
 ./beego-auth orm syncdb -db "auth" -force=true -v=true
 #+end_src
@@ -33,7 +34,7 @@ $ ./beego-auth
 * Testing
 #+begin_src bash
 go test ./conf -v
-go test ./controllers -v
+go test ./pkg/vaultv1 -v
 #+end_src
 
 * General Instructions
@@ -48,11 +49,15 @@ use this, just ignore it.  open conf/app.conf: no such file or directory
 - work-around by providing empty =app.conf= with /include./
 
 ** Create Vault Transit Key
+- [[https://support.hashicorp.com/hc/en-us/articles/4404333857811-How-to-manually-decrypt-transit-data][https://support.hashicorp.com/hc/en-us/articles/4404333857811-How-to-manually-decrypt-transit-data]]
 #+begin_src bash
 $ vault secrets enable transit
 $ vault write -f transit/keys/beego-key
 $ vault list transit/keys
 $ vault read transit/keys/beego-key
+
+# decrypt data previously encrypted by Vault Transit
+$ mage decrypt vault:v1:oZTuFdqpTReBPCV/qHj3itmTa86tybxHBUQxR6Xx3k7IQ0h3DcX6a7s=
 #+end_src
 
 * Where to go from here?

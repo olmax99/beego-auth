@@ -1,4 +1,4 @@
-package controllers
+package vaultv1
 
 import (
 	"log"
@@ -14,6 +14,11 @@ type VaultCrypter struct {
 	client  *vault.Transit
 	config  map[string]string
 	lock    sync.RWMutex
+}
+
+// GetTransit returns initial *vault.Transit client object
+func (vc *VaultCrypter) GetTransitClient() *vault.Transit {
+	return vc.client
 }
 
 // GetClient shows Vault mount point
@@ -32,17 +37,40 @@ func (vc *VaultCrypter) GetVaultv1() string {
 }
 
 // Vaultv1 Set private var vaultv1
-func (vc *VaultCrypter) SetVaultv1(v string) {
+func (vc *VaultCrypter) SetVaultv1(v string) error {
 	vc.vaultv1 = v
+	if err := vc.de(); err != nil {
+		log.Printf("ERROR [*] VaultDecrypter.Set().. %v", err)
+		return err
+	}
+	return nil
 }
 
 // Value Set private var value
-func (vc *VaultCrypter) SetValue(v string) {
+func (vc *VaultCrypter) SetValue(v string) error {
 	vc.value = v
+	if err := vc.en(); err != nil {
+		log.Printf("ERROR [*] VaultCrypter.En().. %v", err)
+		return err
+	}
+	return nil
+}
+
+func (vc *VaultCrypter) Match(p string) bool {
+	return vc.value == p
+}
+
+func (vc *VaultCrypter) FromBytes(b []byte) error {
+	vc.value = string(b)
+	if err := vc.en(); err != nil {
+		log.Printf("ERROR [*] From bytes failed.. %v", err)
+		return err
+	}
+	return nil
 }
 
 // Create the decrypted user password value from the vault:v1 string
-func (vc *VaultCrypter) De() error {
+func (vc *VaultCrypter) de() error {
 	vc.lock.Lock()
 	defer vc.lock.Unlock()
 	v, err := vc.client.Decrypt(vc.config["beego_vault_transit_key"], &vault.TransitDecryptOptions{
@@ -57,7 +85,7 @@ func (vc *VaultCrypter) De() error {
 }
 
 // Send plaintext to Vault and derive the vault:v1 value
-func (vc *VaultCrypter) En() error {
+func (vc *VaultCrypter) en() error {
 	vc.lock.Lock()
 	defer vc.lock.Unlock()
 	enc, err := vc.client.Encrypt(vc.config["beego_vault_transit_key"], &vault.TransitEncryptOptions{
@@ -71,16 +99,11 @@ func (vc *VaultCrypter) En() error {
 	return nil
 }
 
-func (vc *VaultCrypter) Match(p string) bool {
-	return vc.value == p
-}
-
-func (vc *VaultCrypter) FromBytes(b []byte) string {
-	vc.value = string(b)
-	if err := vc.En(); err != nil {
-		log.Printf("ERROR [*] From bytes failed.. %v", err)
+// Confirm Transit client can connect to Vault
+func Confirm(c map[string]string) {
+	if nc := NewCrypter(c); nc == nil {
+		log.Fatalf("PANIC [-] VaultClient.. Please verify address, token, and key.")
 	}
-	return vc.vaultv1
 }
 
 // Create a new Vault Transit container using Beego Configuration parameters
@@ -95,7 +118,6 @@ func NewCrypter(beeCfg map[string]string) *VaultCrypter {
 		return nil
 	}
 	if t := client.Token(); t == "" {
-		log.Println("WARNING [*] No token found in environment. Try config..")
 		client.SetToken(c.config["beego_vault_token"])
 	}
 	c.client = client.Transit()

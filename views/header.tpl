@@ -15,17 +15,19 @@
             {{if .InSession}}
             Welcome, {{.First}} [<a href="http://localhost:{{.Httpport}}/user/logout">Logout</a>|<a href="http://localhost:{{.Httpport}}/user/profile">Profile</a>]
             {{else}}
-                [<a href="http://localhost:{{.Httpport}}/user/login/home">Login</a>]
-                {{end}}
+            [<a href="http://localhost:{{.Httpport}}/user/login/console">Login</a>]
+            {{end}}
         </div>
         <div class="wrapper clearfix">
             <div id="logo">
                 <a href="#"><img src="/static/img/logo.png" alt="LOGO"></a>
             </div>
             <ul id="navigation">
+                {{if .InSession}}
                 <li class="selected">
-                    <a href="http://localhost:{{.Httpport}}/home">home</a>
+                    <a href="http://localhost:{{.Httpport}}/console">home</a>
                 </li>
+                {{end}}
                 <li>
                     <a href="#">About</a>
                 </li>
