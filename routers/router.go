@@ -14,7 +14,7 @@ func init() {
 	beego.Router("/user/genpass1/:uuid([0-9A-Fa-f]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89ABab][0-9a-fA-F]{3}-[a-fA-F0-9]{12}$)", &controllers.DefaultController{}, "get:Genpass1")
 	beego.Router("/user/reset", &controllers.DefaultController{}, "get,post:Reset")
 	beego.Router("/notice", &controllers.DefaultController{}, "get:Notice")
-	// ---- requires login---------
+	// ---- Endpoints with filter: requires Session---------
 	beego.Router("/console", &controllers.DefaultController{})
 	beego.Router("/user/profile", &controllers.DefaultController{}, "get,post:Profile")
 	beego.Router("/user/remove", &controllers.DefaultController{}, "get,post:Remove")

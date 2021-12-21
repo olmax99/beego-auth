@@ -38,10 +38,8 @@ func (ctl *DefaultController) activeContent(view string) {
 		// if the user is logged in (--> there is a non-nil session),
 		// then we set the InSession parameter to a value (any value),
 		// which tells the templating engine to use the “Welcome” bar instead of “Login”.
-		if sess != nil {
+		if m, ok := sess.(map[string]interface{}); ok {
 			ctl.Data["InSession"] = 1 // for login bar in header.tpl
-			m := sess.(map[string]interface{})
-			// m["first"] refers to the sessions user's first name
 			ctl.Data["First"] = m["first"]
 		}
 	}
@@ -60,8 +58,7 @@ func (ctl *DefaultController) Get() {
 	fmt.Println("INFO [*] username is", m["username"])
 	fmt.Println("INFO [*] logged in at", m["timestamp"])
 
-	err := ctl.Render()
-	if err != nil {
+	if err := ctl.Render(); err != nil {
 		fmt.Println(err)
 	}
 }
@@ -78,8 +75,7 @@ func (ctl *DefaultController) Notice() {
 		ctl.Data["notice"] = n
 	}
 
-	err := ctl.Render()
-	if err != nil {
+	if err := ctl.Render(); err != nil {
 		fmt.Println(err)
 	}
 }

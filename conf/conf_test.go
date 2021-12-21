@@ -56,9 +56,4 @@ func TestBeeConfStringConvertion(t *testing.T) {
 			t.Fatalf("res %s, exp %s", res["beego_db_alias"], tt.exp["beego_db_alias"])
 		}
 	}
-	t.Cleanup(func() {
-		if err := os.RemoveAll(tmpDir); err != nil {
-			fmt.Printf("[INFO] clean %s", tmpDir)
-		}
-	})
 }

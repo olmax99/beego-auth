@@ -14,6 +14,8 @@ Beegoist]]" (2014, [[https://github.com/horrido][Richard Eng]]).
 * Prerequisites
 - Beego v2.0.2
 - Go 1.16.x
+- Vault v1.9.0
+- Sendgrid (Account, Api Token)
 
 * Getting Started
 ** Run Main
@@ -29,12 +31,14 @@ $ ./beego-auth
 # rebuild database (all prior data lost!)
 ./beego-auth orm syncdb -h
 ./beego-auth orm syncdb -db "auth" -force=true -v=true
+
+# Schema
+./beego-auth orm sqlall -db "auth"
 #+end_src
 
 * Testing
 #+begin_src bash
-go test ./conf -v
-go test ./pkg/vaultv1 -v
+$ mage Check  # run all tests
 #+end_src
 
 * General Instructions

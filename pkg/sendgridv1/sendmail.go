@@ -1,17 +1,22 @@
 package sendgridv1
 
 import (
-	"beego-auth/models"
 	"bytes"
 	"context"
 	"encoding/json"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"text/template"
 
+	"github.com/sendgrid/rest"
 	"github.com/sendgrid/sendgrid-go"
 	"github.com/sendgrid/sendgrid-go/helpers/mail"
+)
+
+var (
+	abs_path = os.Getenv("BEEGO_ABS_PATH")
 )
 
 type Dkim1 struct {
@@ -59,54 +64,70 @@ type sgApiResponse struct {
 	LastValidationAttemptAt int           `json:"last_validation_attempt_at"`
 }
 
-// get_Domain() retrieves the Domain from a 'whitelabel/domains' response
-func (r *sgApiResponse) get_Domain() string {
-	return r.Domain
+// TODO: Interface that reflects any Api Response struct
+type sgRequestGet struct {
+	res    []sgApiResponse
+	apikey string
+	url    string
+	host   string
 }
 
-// confirmDomainAuthenticated verify domain is verified in SG account
-func (r *sgApiResponse) confirmDomainAuthenticated(c map[string]string) {
-	accReq := sendgrid.GetRequest(c["beego_sg_api_key"], "/v3/whitelabel/domains", "")
-	accResp, err := sendgrid.MakeRequestRetryWithContext(context.TODO(), accReq)
-	if err != nil {
-		log.Printf("WARNING [-] SendgridApi.. Please verify that the api key corresponds to the sg account.")
-	}
-	var ag []sgApiResponse
-	err = json.Unmarshal([]byte(accResp.Body), &ag)
-	if err != nil {
-		log.Printf("WARNING [-] SendgridApi response, %s", err)
-	}
+type sgReqConf func(wdr *sgRequestGet)
 
-	if dc := strings.Split(os.Getenv("BEEGO_SENDGRID_OWN_SUPPORT"), "@"); dc[1] != ag[0].get_Domain() {
-		log.Fatalf("PANIC [-] Sendgrid Sender Email '%s'.. ensure that the sender email is matching with the authenticated user domain.", c["beego_sg_own_support"])
+// NewSgReq Handler for general purpose sendgrid GET requests
+func NewSgReq(apikey string, conf ...sgReqConf) sgRequestGet {
+	wld := sgRequestGet{
+		res:    []sgApiResponse{},
+		apikey: apikey,
+		host:   "https://api.sendgrid.com",
+	}
+	for _, c := range conf {
+		c(&wld)
+	}
+	return wld
+}
+
+type sgSendConf func(sm *sgSendMail)
+
+type sgSendMail struct {
+	client  sendgrid.Client
+	from    mail.Email
+	to      mail.Email
+	resp    rest.Response
+	content string
+}
+
+func NewSgSendMail(apikey, beego_own_support, send_name string, conf ...sgSendConf) sgSendMail {
+	name := send_name
+	if send_name == "" {
+		name = strings.Split(beego_own_support, "@")[0]
+	}
+	sm := sgSendMail{
+		client: *sendgrid.NewSendClient(apikey),
+		from: mail.Email{
+			Name:    name,
+			Address: beego_own_support,
+		},
+		resp: rest.Response{},
+	}
+	for _, c := range conf {
+		c(&sm)
+	}
+	return sm
+}
+
+// mailTo attach address of mail receiver to new sgSendMail.to variable
+func MailTo(to_name, to_addr string) sgSendConf {
+	return func(sm *sgSendMail) {
+		sm.to = mail.Email{
+			Name:    to_name,
+			Address: to_addr,
+		}
 	}
 }
 
-// confirmSgApiKey client check, verify SG api confirmSgApiKey
-func confirmSgApiKey(c map[string]string) {
-	authReq := sendgrid.GetRequest(c["beego_sg_api_key"], "/v3/templates", "")
-	authResp, err := sendgrid.MakeRequestRetryWithContext(context.TODO(), authReq)
-	if err != nil {
-		log.Printf("WARNING [-] SendgridClient.. Please verify that the api key corresponds to the sg account.")
-	}
-	switch authResp.StatusCode {
-	case 200:
-	case 403:
-		log.Fatalf("PANIC [-] SendgridClient.. %d, wrong api key.", authResp.StatusCode)
-	default:
-		log.Fatalf("PANIC [-] SendgridClient.. %d", authResp.StatusCode)
-	}
-}
-
-// verification email after user registered
-func SendVerification(authusr *models.AuthUser, uid string, conf map[string]string) bool {
-	// Step 1: -------------------- Prepare html---------------------------------
-	link := "http://localhost:" + conf["httpport"] + "/user/verify/" + uid
-	pwd, err := os.Getwd()
-	if err != nil {
-		log.Fatal(err)
-	}
-	t, err := template.New("verification.tpl").ParseFiles(pwd + "/pkg/sendgridv1/verification.tpl")
+func PrepareHtml(user_name, link, template_name string) sgSendConf {
+	t, err := template.New(template_name).ParseFiles(filepath.Join(abs_path, "pkg/sendgridv1/templates", template_name))
 	if err != nil {
 		log.Printf("ERROR [*] Parse html failed.. %v", err)
 	}
@@ -114,107 +135,21 @@ func SendVerification(authusr *models.AuthUser, uid string, conf map[string]stri
 		User string
 		Link string
 	}{
-		User: string(authusr.First),
+		User: user_name,
 		Link: link,
 	}
 
 	var tplOut bytes.Buffer
 	if err := t.Execute(&tplOut, data); err != nil {
-		log.Printf("ERROR [*] sendVerification: tpl.exec failed.. %v", err)
-		return false
+		log.Printf("ERROR [*] PrepareHtml: tpl.exec failed.. %v", err)
 	}
-	content := tplOut.String()
-
-	// Step 2: -------------------- Send Email-----------------------------------
-	from := mail.NewEmail("Your Support Team", conf["beego_sg_own_support"])
-	subject := "Sending with SendGrid: account verification"
-	to := mail.NewEmail("Peter Pan", authusr.Email)
-	htmlContent := content
-	message := mail.NewSingleEmail(from, subject, to, "", htmlContent)
-
-	// -> /v3/mail/send
-	// TODO: This does not catch response errors, i.e. Request successful, but
-	// error within sendgrid ('the from address does not match a verified Sender
-	// Identity')
-	sg_client := sendgrid.NewSendClient(conf["beego_sg_api_key"])
-	response, err := sg_client.Send(message)
-	if err != nil {
-		log.Printf("ERROR [*] Sending email failed.. %v", err)
-		return false
-	}
-	switch response.StatusCode {
-	case 200:
-		return true
-	case 202:
-		return true
-	case 403:
-		log.Printf("DEBUG [*] Sendgrid 403, body: %s", response.Body)
-		return false
-	default:
-		log.Printf("DEBUG [*] Sendgrid response, status: %v", response.StatusCode)
-		log.Printf("DEBUG [*] Sendgrid response, body: %v", response.Body)
-		log.Printf("DEBUG [*] Sendgrid response, header: %#v", response.Headers)
-		return false
+	return func(sm *sgSendMail) {
+		sm.content = tplOut.String()
 	}
 }
 
-// verification email after user cancelled
-func SendCancellation(authusr *models.AuthUser, uid string, conf map[string]string) bool {
-	// Step 1: -------------------- Prepare html---------------------------------
-	link := "http://localhost:" + conf["httpport"] + "/user/cancel/" + uid
-	pwd, err := os.Getwd()
-	if err != nil {
-		log.Fatal(err)
-	}
-	t, err := template.New("cancellation.tpl").ParseFiles(pwd + "/pkg/sendgridv1/cancellation.tpl")
-	if err != nil {
-		log.Printf("ERROR [*] Parse html failed.. %v", err)
-	}
-	data := struct {
-		User string
-		Link string
-	}{
-		User: string(authusr.First),
-		Link: link,
-	}
-
-	var tplOut bytes.Buffer
-	if err := t.Execute(&tplOut, data); err != nil {
-		log.Printf("ERROR [*] sendCancellation: tpl.exec failed.. %v", err)
-		return false
-	}
-	content := tplOut.String()
-
-	// Step 2: -------------------- Send Email-----------------------------------
-	from := mail.NewEmail("Your Support Team", conf["beego_sg_own_support"])
-	subject := "Sending with SendGrid: account cancellation"
-	to := mail.NewEmail("Peter Pan", authusr.Email)
-	htmlContent := content
-	message := mail.NewSingleEmail(from, subject, to, "", htmlContent)
-
-	// -> /v3/mail/send
-	sg_client := sendgrid.NewSendClient(conf["beego_sg_api_key"])
-	response, err := sg_client.Send(message)
-	if err != nil {
-		log.Printf("ERROR [*] Sending email failed.. %v", err)
-		return false
-	} else {
-		log.Printf("DEBUG [*] Sendgrid response, status: %v", response.StatusCode)
-		log.Printf("DEBUG [*] Sendgrid response, body: %v", response.Body)
-		log.Printf("DEBUG [*] Sendgrid response, header: %#v", response.Headers)
-	}
-	return true
-}
-
-// verification email after user initiated to reset password
-func SendReset(authusr *models.AuthUser, uid string, pass []byte, conf map[string]string) bool {
-	// Step 1: -------------------- Prepare html---------------------------------
-	link := "http://localhost:" + conf["httpport"] + "/user/genpass1/" + uid
-	pwd, err := os.Getwd()
-	if err != nil {
-		log.Fatal(err)
-	}
-	t, err := template.New("reset.tpl").ParseFiles(pwd + "/pkg/sendgridv1/reset.tpl")
+func PrepareHtmlWithReset(user_name, link, reset_pass, template_name string) sgSendConf {
+	t, err := template.New(template_name).ParseFiles(filepath.Join(abs_path, "pkg/sendgridv1/templates", template_name))
 	if err != nil {
 		log.Printf("ERROR [*] Parse html failed.. %v", err)
 	}
@@ -224,42 +159,49 @@ func SendReset(authusr *models.AuthUser, uid string, pass []byte, conf map[strin
 		Link string
 		RanB string
 	}{
-		User: string(authusr.First),
+		User: user_name,
 		Link: link,
-		RanB: string(pass),
+		RanB: reset_pass,
 	}
 
 	var tplOut bytes.Buffer
 	if err := t.Execute(&tplOut, data); err != nil {
-		log.Printf("ERROR [*] sendReset: tpl.exec failed.. %v", err)
-		return false
+		log.Printf("ERROR [*] PrepareHtmlWithReset: tpl.exec failed.. %v", err)
 	}
-	content := tplOut.String()
-
-	// Step 2: -------------------- Send Email-----------------------------------
-	from := mail.NewEmail("Your Support Team", conf["beego_sg_own_support"])
-	subject := "Sending with SendGrid: password reset"
-	to := mail.NewEmail("Peter Pan", authusr.Email)
-	htmlContent := content
-	message := mail.NewSingleEmail(from, subject, to, "", htmlContent)
-
-	// -> /v3/mail/send
-	sg_client := sendgrid.NewSendClient(conf["beego_sg_api_key"])
-	response, err := sg_client.Send(message)
-	if err != nil {
-		log.Printf("ERROR [*] Sending email failed.. %v", err)
-		return false
-	} else {
-		log.Printf("DEBUG [*] Sendgrid response, status: %v", response.StatusCode)
-		log.Printf("DEBUG [*] Sendgrid response, body: %v", response.Body)
-		log.Printf("DEBUG [*] Sendgrid response, header: %#v", response.Headers)
+	return func(sm *sgSendMail) {
+		sm.content = tplOut.String()
 	}
-	return true
 }
 
-// Confirm sendgrid api key and is valid and authenticated domain matches with sender email
-func Confirm(c map[string]string) {
-	ag := sgApiResponse{}
-	confirmSgApiKey(c)
-	ag.confirmDomainAuthenticated(c)
+func (sgReq *sgRequestGet) SgGet(url string) ([]sgApiResponse, error) {
+	accReq := sendgrid.GetRequest(sgReq.apikey, url, sgReq.host)
+	accResp, err := sendgrid.MakeRequestRetryWithContext(context.TODO(), accReq)
+	if err != nil {
+		log.Printf("WARNING [-] SendgridApi.. Please verify that the api key corresponds to the sg account.")
+		return nil, err
+	}
+	err = json.Unmarshal([]byte(accResp.Body), &sgReq.res)
+	if err != nil {
+		log.Printf("WARNING [-] SendgridApi response, %s", err)
+		return nil, err
+	}
+	return sgReq.res, nil
+}
+
+// ConfirmSgAccountDomain compare account domain to sendgrid support sender address
+func (sgReq *sgRequestGet) ConfirmSgAccountDomain() {
+	exp := strings.Split(os.Getenv("BEEGO_SENDGRID_OWN_SUPPORT"), "@")
+	if exp[1] != sgReq.res[0].Domain {
+		log.Fatalf("PANIC [-] Sendgrid Sender Email '%s'.. ensure that the sender email is matching with the authenticated user domain.", exp)
+	}
+}
+
+func (sgSend *sgSendMail) Send(subject string) *rest.Response {
+	message := mail.NewSingleEmail(&sgSend.from, subject, &sgSend.to, "", sgSend.content)
+	response, err := sgSend.client.Send(message)
+	if err != nil {
+		log.Printf("ERROR [*] sgSendMail.Send.. %v", err)
+		return nil
+	}
+	return response
 }

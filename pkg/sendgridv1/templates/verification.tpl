@@ -293,7 +293,7 @@ ox; ">
 <td style="box-sizing: border-box; padding: 0; font-family: 'Open Sans', 'Helvetica Neue', 'Helvetica', Helvetica, Arial, sans-serif; font-size: 16px; vertical-align: top;" valign="top"></td>
 </tr>
 </tbody>
-</table>y
+</table>
 
 <img src="http://links.twilio.com/trk?t=1&mid=Mjk0LVRLQi0zMDA6MDo5MTIyOjkwNTE5OjA6MTE4NjU6OTo0Mjg5MTo2ODkyNDIyMC0xOm51bGw%" width="1" height="1" style="display:none !important;" alt="" />
 

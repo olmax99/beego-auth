@@ -9,33 +9,19 @@ import (
 	"beego-auth/models"
 	_ "beego-auth/routers"
 
-	mail "beego-auth/pkg/sendgridv1"
 	crypt "beego-auth/pkg/vaultv1"
 
-	"github.com/beego/beego/v2/adapter/orm"
+	"github.com/beego/beego/v2/client/orm"
+	"github.com/beego/beego/v2/core/logs"
 	beego "github.com/beego/beego/v2/server/web"
 	_ "github.com/mattn/go-sqlite3"
 )
 
+const (
+	APP_VER = "0.1.1.0227"
+)
+
 func init() {
-	beeC := conf.BeeConf("", "db::beego_db_alias")
-	dbalias := beeC["beego_db_alias"]
-
-	// ------------ SQLite--------------
-	os.MkdirAll("./data/dev/", 0755)
-	if err := orm.RegisterDriver("sqlite3", orm.DRSqlite); err != nil {
-		log.Fatalf("PANIC [-] orm.RegisterDriver.. %s", err)
-	}
-	if err := orm.RegisterDataBase("default", "sqlite3", "./data/dev/default.db"); err != nil {
-		log.Fatalf("PANIC [-] orm.RegisterDatabase.. %s", err)
-	}
-	if err := orm.RegisterDataBase(dbalias, "sqlite3", "./data/dev/"+dbalias+".db"); err != nil {
-		log.Fatalf("PANIC [-] orm.RegisterDatabase.. %s", err)
-	}
-	orm.RegisterModel(new(models.AuthUser))
-}
-
-func main() {
 	beeC := conf.BeeConf("",
 		"db::beego_db_alias",
 		"db::beego_db_bootstrap",
@@ -47,6 +33,36 @@ func main() {
 		"sendgrid::beego_sg_api_key",
 	)
 	conf.PrettyConf(beeC)
+
+	// ------------ SQLite--------------
+	os.MkdirAll("./data/dev/", 0755)
+	if err := orm.RegisterDriver("sqlite3", orm.DRSqlite); err != nil {
+		log.Fatalf("PANIC [-] orm.RegisterDriver.. %s", err)
+	}
+	if err := orm.RegisterDataBase("default", "sqlite3", "./data/dev/default.db"); err != nil {
+		log.Fatalf("PANIC [-] orm.RegisterDatabase.. %s", err)
+	}
+	if err := orm.RegisterDataBase(beeC["beego_db_alias"], "sqlite3", "./data/dev/"+beeC["beego_db_alias"]+".db"); err != nil {
+		log.Fatalf("PANIC [-] orm.RegisterDatabase.. %s", err)
+	}
+	orm.RegisterModel(models.NewAuthUserModel())
+}
+
+func main() {
+	beeC := conf.BeeConf("",
+		"db::beego_db_alias",
+		"db::beego_db_bootstrap",
+		"db::beego_db_debug",
+		"vault::beego_vault_token",
+		"vault::beego_vault_transit_key",
+		"vault::beego_vault_address",
+	)
+
+	// ------------- LOGS-----------------
+	// TODO: Adjust for using Beego built-in logger
+	logs.EnableFuncCallDepth(true)
+	logb := logs.NewLogger(10000)
+	logb.SetLogger("console", "")
 
 	// ------------- DATABASE-------------
 	force := false
@@ -72,11 +88,11 @@ func main() {
 		log.Printf("WARNING [*] Ensure to update your environment variables if '%s' database is not the one you want to use.", beeC["beego_db_alias"])
 	}
 	crypt.Confirm(beeC) // Vault check
-	mail.Confirm(beeC)  // Sendgrid check
 
 	// ------------ RUN BEEGO APP---------
 	beego.BConfig.WebConfig.Session.SessionOn = true // extra configs
 
+	logb.Info("VERSION: " + APP_VER)
 	beego.Run() // beego.Run() default run on HttpPort
 
 }

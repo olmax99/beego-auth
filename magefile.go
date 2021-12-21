@@ -1,7 +1,7 @@
 //go:build mage
 // +build mage
 
-// Collection of helper scripts.
+// Collection of helper scripts. Use mage -v <target> for verbose output.
 package main
 
 import (
@@ -10,28 +10,99 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"io/ioutil"
 	"path/filepath"
 	"strings"
 
+	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 	"github.com/magefile/mage/target"
 
 	crypt "beego-auth/pkg/vaultv1"
 )
 
+const (
+	packageName  = "github.com/olmax99/beego-auth"
+)
+
 var Aliases = map[string]interface{}{
 	"e":  Encrypt,
 	"d":  Decrypt,
 	"sc": SyncConf,
+	"t": Check,
+}
+
+var testPackages = [4]string{
+	"conf",
+	"models",
+	"pkg/sendgridv1",
+	"pkg/vaultv1",
 }
 
 // use as sources for syncing configs
-var config_sources = []string{
+var config_sources = [5]string{
 	"conf/app.conf",
 	"conf/dev.app.conf",
 	".beego.env",
 	".sendgrid_api.key",
 	".vault_root_dev.key",
+}
+
+// Only with Build
+// func flagEnv() map[string]string {
+// 	hash, _ := sh.Output("git", "rev-parse", "--short", "HEAD")
+// 	return map[string]string{
+// 		"PACKAGE":     packageName,
+// 		"COMMIT_HASH": hash,
+// 		"BUILD_DATE":  time.Now().Format("2006-01-02T15:04:05Z0700"),
+// 	}
+// }
+
+// Build binary
+// func Build() error {
+// 	return runWith(flagEnv(), "go", "build", "-ldflags", ldflags, buildFlags(), "-tags", buildTags(), packageName)
+// }
+
+// Check Run tests and linters
+func Check() {
+	mg.Deps(Vet)
+	// don't run two tests in parallel, they saturate the CPUs anyway, and running two
+	// causes memory issues in CI.
+	mg.Deps(Test)
+}
+
+// Test Run only tests
+func Test() error {
+	for _, pkg := range testPackages {
+		switch pkg {
+		case "models":
+			sql, err := sh.Output("./beego-auth", "orm", "sqlall", "-db", "auth")
+			if err != nil {
+				return err
+			}
+			if err := ioutil.WriteFile("./"+pkg+"/testdb.sql", []byte(sql), 0755); err != nil {
+				return err
+			}
+			fallthrough
+		default:
+			// if err := sh.Run("go", "test", "-coverprofile="+cover, "-covermode=count", pkg); err != nil {
+			// 	return err
+			// }
+			env := map[string]string{"GOFLAGS": testGoFlags()}
+			if err:= runCmd(env, "go", "test", "./"+pkg, "-tags", buildTags(), "-v"); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// Vet Run go vet linter
+func Vet() error {
+	if err := sh.Run("go", "vet", "./..."); err != nil {
+		return fmt.Errorf("error running go vet: %v", err)
+	}
+	return nil
 }
 
 // SyncConf backup config files (non-git) to target folder
@@ -104,4 +175,63 @@ func Encrypt(ctx context.Context, plain string) error {
 	}
 	fmt.Printf("------\n'%s'\n", crypt.GetVaultv1())
 	return nil
+}
+
+
+// ---------------------------- HELPERS------------------------------------
+
+func runCmd(env map[string]string, cmd string, args ...interface{}) error {
+	if mg.Verbose() {
+		return runWith(env, cmd, args...)
+	}
+	output, err := sh.OutputWith(env, cmd, argsToStrings(args...)...)
+	if err != nil {
+		fmt.Fprint(os.Stderr, output)
+	}
+
+	return err
+}
+
+func runWith(env map[string]string, cmd string, inArgs ...interface{}) error {
+	s := argsToStrings(inArgs...)
+	return sh.RunWith(env, cmd, s...)
+}
+
+func buildTags() string {
+	if envtags := os.Getenv("BEEGO_BUILD_TAGS"); envtags != "" {
+		return envtags
+	}
+	return "none"
+}
+
+func argsToStrings(v ...interface{}) []string {
+	var args []string
+	for _, arg := range v {
+		switch v := arg.(type) {
+		case string:
+			if v != "" {
+				args = append(args, v)
+			}
+		case []string:
+			if v != nil {
+				args = append(args, v...)
+			}
+		default:
+			panic("invalid type")
+		}
+	}
+
+	return args
+}
+
+func isCI() bool {
+	return os.Getenv("CI") != ""
+}
+
+func testGoFlags() string {
+	if isCI() {
+		return ""
+	}
+	// skips long-running test cases (not implemented, yet)
+	return "-short"
 }
