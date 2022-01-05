@@ -4,7 +4,13 @@ import (
 	"beego-auth/conf"
 	"fmt"
 
+	"github.com/beego/beego/v2/core/logs"
+
 	beego "github.com/beego/beego/v2/server/web"
+)
+
+var (
+	logB = logs.NewLogger(10000)
 )
 
 // struct embedding <-- Go mimicing inheritance

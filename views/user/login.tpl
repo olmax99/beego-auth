@@ -1,16 +1,27 @@
 <div id="content">
-    <h1>Welcome.</h1>
-    &nbsp;
-    {{if .flash.error}}
-    <h3>{{.flash.error}}</h3>
-    &nbsp;
-    {{end}}
-    {{if .Errors}}
-    {{range $rec := .Errors}}
-    <h3>{{$rec}}</h3>
-    {{end}}
-    &nbsp;
-    {{end}}
+    <div class="container">
+        <div id=message-row class="row">
+            <div id="message-box" class="column">
+                <div  class="card" style="width: 18rem;">
+                    <div class="card-body">
+                        <h4 class="card-title">Welcome</h5>
+                            &nbsp;
+                            {{if .flash.error}}
+                            <p>{{.flash.error}}</p>
+                            &nbsp;
+                            {{end}}
+                            {{if .Errors}}
+                            {{range $rec := .Errors}}
+                            <p>{{$rec}}</p>
+                            {{end}}
+                            &nbsp;
+                            {{end}}
+                            <div id="message-content" class="card-text"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
     <form method="POST">
         <table>
             <tr>

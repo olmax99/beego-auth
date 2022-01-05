@@ -61,8 +61,8 @@ func main() {
 	// ------------- LOGS-----------------
 	// TODO: Adjust for using Beego built-in logger
 	logs.EnableFuncCallDepth(true)
-	logb := logs.NewLogger(10000)
-	logb.SetLogger("console", "")
+	logB := logs.NewLogger(10000)
+	logB.SetLogger("console", "")
 
 	// ------------- DATABASE-------------
 	force := false
@@ -92,7 +92,7 @@ func main() {
 	// ------------ RUN BEEGO APP---------
 	beego.BConfig.WebConfig.Session.SessionOn = true // extra configs
 
-	logb.Info("VERSION: " + APP_VER)
+	logB.Info("[main.go:25] APP: " + beego.BConfig.AppName + ", VERSION: " + APP_VER)
 	beego.Run() // beego.Run() default run on HttpPort
 
 }

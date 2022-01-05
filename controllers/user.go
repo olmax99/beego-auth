@@ -21,7 +21,6 @@ import (
 	beego "github.com/beego/beego/v2/server/web"
 )
 
-// TODO: separate all beego stuff: no need for testing
 func (ctl *DefaultController) Login() {
 	// ----------------------------GET ---------------------------------------------
 	ctl.activeContent("user/login")
@@ -146,6 +145,7 @@ func (ctl *DefaultController) Logout() {
 	return
 }
 
+// Register
 func (ctl *DefaultController) Register() {
 	// ----------------------------GET ---------------------------------------------
 	ctl.activeContent("user/register")
@@ -222,8 +222,7 @@ func (ctl *DefaultController) Register() {
 		uid4 := uuid.NewV4() // new user verify uuid
 		user := models.NewUser(beeC["beego_db_alias"],
 			models.PrepareWrite(first, last, email, crypt.GetVaultv1(), uid4.String()))
-		err := user.UserInsertTx()
-		if err != nil {
+		if err := user.UserInsertTx(); err != nil {
 			log.Printf("ERROR [*] Register() Insert.. %v", err)
 			// TODO: confirm if other errors need to be handled??
 			flash.Error("User with email" + email + " already exists.")
@@ -258,10 +257,11 @@ func (ctl *DefaultController) Register() {
 			return
 		}
 
-		// Step 4: --------------- Append confirmation to flash & redirect------
-		flash.Notice("Your account has been created. An email is on the way to you. Please verify your address by following the link.")
-		flash.Store(&ctl.Controller)
-		ctl.Redirect("/notice", 302)
+		// Step 4: --------------- Append confirmation to notifier & redirect-----
+		message := "Your account has been created. An email is on the way to you. Please verify your address by following the link."
+		sid := ctl.CruSession.SessionID(ctl.Ctx.Request.Context())
+		publish <- newEvent(models.EVENT_MESSAGE, sid, message)
+		ctl.Redirect("/user/login/console", 302)
 		return
 	}
 
@@ -403,6 +403,7 @@ func (ctl *DefaultController) Genpass1() {
 		ctl.Redirect("/user/genpass2", 307)
 		return
 	}
+	// TODO: long-polling
 	flash.Notice("You can now login with your temporary password.")
 	flash.Store(&ctl.Controller)
 	ctl.Redirect("/notice", 302)

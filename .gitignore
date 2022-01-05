@@ -5,8 +5,13 @@
 # *.[oa]
 # *~
 /lastupdate.tmp
-/static
 /media
 /.beego.env
 /beego-auth
 /data
+vendor/
+/models/testdb.sql
+/conf/dev.app.conf
+/conf/app.conf
+/.vault_root_dev.key
+/.sendgrid_api.key

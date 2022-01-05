@@ -4,8 +4,19 @@
 
 <head>
     <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <link rel="shortcut icon" href="/static/img/favicon.png" />
+    <meta name="author" content="Unknown" />
+    <meta name="description" content="Beego authentication" />
+    <meta name="keywords" content="Go, golang, beego, authentication">
+
     <title>Astronomy Website Template</title>
+
     <link href="/static/css/default.css" rel="stylesheet" type="text/css" />
+    <link href="/static/css/bootstrap.min.css" rel="stylesheet" />
+
+    <script src="/static/js/jquery-1.10.1.min.js"></script>
+
+    <script src="/static/js/notifier.js"></script>
 </head>
 
 <body>
