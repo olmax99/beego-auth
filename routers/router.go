@@ -17,7 +17,7 @@ func init() {
 	// Notifier implements long polling.
 	beego.Router("/notifier/fetch/:lastreceived([0-9]+)", &controllers.NotifierController{}, "get:Fetch")
 
-	// ---- Endpoints with filter: requires Session---------
+	// --------- Endpoints with filter: require Login-------------
 	beego.Router("/console", &controllers.DefaultController{})
 	beego.Router("/user/profile", &controllers.DefaultController{}, "get,post:Profile")
 	beego.Router("/user/remove", &controllers.DefaultController{}, "get,post:Remove")

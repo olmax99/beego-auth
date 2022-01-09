@@ -3,7 +3,6 @@ package controllers
 import (
 	"fmt"
 	"log"
-	"net/url"
 	"strings"
 	"time"
 
@@ -68,7 +67,7 @@ func (ctl *DefaultController) Login() {
 			flash.Error("No such user.")
 			flash.Store(&ctl.Controller)
 			if err := ctl.DelSession(beeC["sessionname"]); err != nil {
-				log.Printf("ERROR [*] Login()User.confirm().. %s", err)
+				log.Printf("ERROR [*] Login() ctl.DelSession().. %s", err)
 			}
 			if err := ctl.Render(); err != nil {
 				log.Println(err)
@@ -81,7 +80,7 @@ func (ctl *DefaultController) Login() {
 			flash.Error("Account not active.")
 			flash.Store(&ctl.Controller)
 			if err := ctl.DelSession(beeC["sessionname"]); err != nil {
-				log.Printf("ERROR [*] Login()User.confirm().. %s", err)
+				log.Printf("ERROR [*] Login().. ctl.DelSession() %s", err)
 			}
 			if err := ctl.Render(); err != nil {
 				log.Println(err)
@@ -273,7 +272,7 @@ func (ctl *DefaultController) Register() {
 
 func (ctl *DefaultController) Verify() {
 	// ----------------------------- GET--------------------------------------------
-	ctl.activeContent("user/verify")
+	ctl.activeContent("user/login")
 
 	flash := beego.NewFlash()
 
@@ -298,18 +297,17 @@ func (ctl *DefaultController) Verify() {
 		}
 		return
 	}
-	ctl.Data["Verified"] = 1
-	// Remove registration key after context has 'Verified=1'
+	// Remove registration key
 	if err := user.UserRemoveRegKey(); err != nil {
-		delete(ctl.Data, "Verified")
 		if err := ctl.DelSession(beeC["sessionname"]); err != nil {
 			log.Printf("ERROR [*] Verify().ctl.DelSession().. %s", err)
 		}
 	}
-	// explicit render (can be omitted by setting: 'autorender = true')
-	if err := ctl.Render(); err != nil {
-		log.Println(err)
-	}
+	message := "Your account has been verified. You may login."
+	sid := ctl.CruSession.SessionID(ctl.Ctx.Request.Context())
+	publish <- newEvent(models.EVENT_MESSAGE, sid, message)
+	ctl.Redirect("/user/login/console", 302)
+	return
 }
 
 func (ctl *DefaultController) Cancel() {
@@ -387,12 +385,15 @@ func (ctl *DefaultController) Genpass1() {
 	if user.GetReset() == uid4 {
 		// set the 24h limit for next passwd reset
 		if err := user.UserUpdateRstDte(time.Now().UTC()); err != nil {
-			flash.Notice("Genpass1.. Updating reset date failed.")
-			flash.Store(&ctl.Controller)
+			message := "Genpass1.. Updating reset date failed."
+			sid := ctl.CruSession.SessionID(ctl.Ctx.Request.Context())
+			publish <- newEvent(models.EVENT_MESSAGE, sid, message)
+
 			if err := ctl.DelSession(beeC["sessionname"]); err != nil {
 				log.Printf("ERROR [*] Cancel().ctl.DelSession().. %s", err)
 			}
-			ctl.Redirect("/notice", 302)
+			ctl.Redirect("/user/login/console", 302)
+			return
 		}
 		// Step 2: ----------- Create new session---------------------------
 		m := make(map[string]interface{})
@@ -403,10 +404,10 @@ func (ctl *DefaultController) Genpass1() {
 		ctl.Redirect("/user/genpass2", 307)
 		return
 	}
-	// TODO: long-polling
-	flash.Notice("You can now login with your temporary password.")
-	flash.Store(&ctl.Controller)
-	ctl.Redirect("/notice", 302)
+	message := "You can now login with your temporary password."
+	sid := ctl.CruSession.SessionID(ctl.Ctx.Request.Context())
+	publish <- newEvent(models.EVENT_MESSAGE, sid, message)
+	ctl.Redirect("/user/login/console", 302)
 	return
 }
 
@@ -520,9 +521,11 @@ func (ctl *DefaultController) Genpass2() {
 			}
 			return
 		}
-		flash.Notice("Your temporary password has been updated.")
-		flash.Store(&ctl.Controller)
-		ctl.Redirect("/notice", 302)
+
+		message := "Your temporary password has been updated."
+		sid := ctl.CruSession.SessionID(ctl.Ctx.Request.Context())
+		publish <- newEvent(models.EVENT_MESSAGE, sid, message)
+		ctl.Redirect("/user/login/console", 302)
 		return
 	}
 	errR := ctl.Render()
@@ -940,9 +943,10 @@ func (ctl *DefaultController) Reset() {
 		}
 
 		// Step 4: ------ Append confirmation to flash & redirect------
-		flash.Notice("Your password has been reset. Please follow the instructions in your confirmation email.")
-		flash.Store(&ctl.Controller)
-		ctl.Redirect("/notice", 302)
+		message := "Your password has been reset. Please follow the instructions in your confirmation email."
+		sid := ctl.CruSession.SessionID(ctl.Ctx.Request.Context())
+		publish <- newEvent(models.EVENT_MESSAGE, sid, message)
+		ctl.Redirect("/user/login/console", 302)
 		return
 	}
 
@@ -957,19 +961,31 @@ var FilterUser = func(ctx *context.Context) {
 	beeC := conf.BeeConf("",
 		"sessionname",
 	)
-	// Do NOT authorize when any of the following is true:
-	// 1. the request does not come from Request.RequestURI "/login"
-	// 2. the request does not come from Request.RequestURI "/register"
-	// 3. the session store is nil (default behavior) or contains an empty map
-	rawurl, err := url.Parse(ctx.Input.Referer())
-	if err != nil {
-		log.Printf("DEBUG [*] FilterUser ctx.Input.Referer: %s", err)
-	}
+	// rawurl, err := url.Parse(ctx.Input.Referer())
+	// if err != nil {
+	// 	log.Printf("DEBUG [*] FilterUser ctx.Input.Referer: %s", err)
+	// }
+
 	// Session gets the Store content. Store contains all data for one session process
 	// with specific id. Type assertion: Session.Store is of type map and not empty
-	_, ok := ctx.Input.Session(beeC["sessionname"]).(map[string]interface{})
-	if (rawurl.Path != "/user/login/console" && rawurl.Path != "/user/register/console") || !ok {
+	v, ok := ctx.Input.Session(beeC["sessionname"]).(map[string]interface{})
+	if !ok {
+		logB.Info("failed ok!")
 		log.Printf("DEBUG [*] FilterUser ctx.Input.CruSession: %#v", ctx.Input.CruSession)
 		ctx.Redirect(302, "/user/login/console")
 	}
+	// if (rawurl.Path == "/user/login/console" || rawurl.Path == "/user/register/console") {
+	// 	log.Printf("DEBUG [*] FilterUser ctx.Input.CruSession: %#v", ctx.Input.CruSession)
+	// 	ctx.Redirect(302, "/user/login/console")
+	// }
+	if v["first"].(string) == "" || v["username"].(string) == "" {
+		log.Printf("DEBUG [*] FilterUser ctx.Input.CruSession: %#v", ctx.Input.CruSession)
+		ctx.Redirect(302, "/user/login/console")
+	}
+	tn := time.Now().UTC()
+	if 1*time.Hour < tn.Sub(v["timestamp"].(time.Time)) {
+		log.Printf("DEBUG [*] FilterUser ctx.Input.CruSession: %#v", ctx.Input.CruSession)
+		ctx.Redirect(302, "/user/login/console")
+	}
+
 }

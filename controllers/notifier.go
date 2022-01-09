@@ -34,7 +34,7 @@ func (ctl *NotifierController) Fetch() {
 
 	sessID := ctl.CruSession.SessionID(ctl.Ctx.Request.Context())
 	events := models.GetEvents(int(lastReceived), sessID)
-	if len(events) == 1 {
+	if len(events) > 0 {
 		logB.Info("[Notifier] Fetch().. found '" + strconv.Itoa(len(events)) + "' event.")
 		var j []models.TEvent
 		j = models.TransformEvents(models.GetEvents(int(lastReceived), sessID))
@@ -42,11 +42,6 @@ func (ctl *NotifierController) Fetch() {
 		if err := ctl.ServeJSON(); err != nil {
 			logB.Error("[Notifier] Fetch(): " + err.Error())
 		}
-		return
-	} else if len(events) > 1 {
-		logB.Info("[Notifier] Fetch().. found '" + strconv.Itoa(len(events)) + "' events.")
-		ctl.Data["json"] = events
-		ctl.ServeJSON()
 		return
 	} else {
 		logB.Info("[Notifier] Fetch().. no events found")
